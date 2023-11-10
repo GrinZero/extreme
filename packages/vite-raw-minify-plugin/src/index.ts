@@ -36,6 +36,7 @@ function rawMinifyPlugin() {
           processConditionalComments: true,
           removeComments: true,
           removeRedundantAttributes: true,
+          keepClosingSlash: true
         });
         const result = `export default "${minifyCode.replaceAll('"', '\\"')}"`;
         return {

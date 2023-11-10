@@ -4,34 +4,35 @@ import template from "./index.html?raw";
 
 export const Counter = (element: HTMLElement) => {
   useStyles(styles);
-  const incrementRef = useRef();
-  const decrementRef = useRef();
-  const cleanRef = useRef();
+  const resetRef = useRef();
   const [count, setCount] = useState(0);
-  const [src, setSrc] = useState("https://www.baidu.com/img/flexible/logo/pc/result.png");
+
+  const decrement = () => {
+    setCount(count() - 1);
+  };
+  const increment = () => {
+    setCount(count() + 1);
+  }
 
   const base = useTemplate(element, template, {
     state: {
-      count: count,
-      src,
+      count
     },
     ref: {
-      incrementRef,
-      decrementRef,
-      cleanRef
+      resetRef,
+    },
+    methods: {
+      decrement,
+      increment
     },
   });
 
-  console.log("decrementRef", decrementRef());
-  decrementRef()?.addEventListener("click",()=>{
-    setCount(count() - 1);
-  })
-  incrementRef()?.addEventListener("click",()=>{
-    setCount(count() + 1);
-  })
-  cleanRef()?.addEventListener("click",()=>{
-    setSrc("");
+  count((newV) => {
+    console.log("newV", newV);
+  });
+
+  resetRef()?.addEventListener("click", () => {
     setCount(0);
-  })
+  });
   return base;
 };
