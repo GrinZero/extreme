@@ -11,6 +11,7 @@ export const useState = <T = unknown>(value: T) => {
     return _value;
   };
   const setValue: SetState<T> = (value: T) => {
+    if(_value === value) return;
     _value = value;
     set.forEach((fn) => fn(_value));
   };
