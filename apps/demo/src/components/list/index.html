@@ -1,0 +1,13 @@
+<div>
+  <h1>List</h1>
+  <ul>
+    <li :for="item in items">
+      <a src="{{item.src}}">{{item.title}}</a>
+      <p>{{item.content}}</p>
+    </li>
+  </ul>
+  <button @click="{{handleAdd}}">Add</button>
+  <button @click="{{handleReset}}">Reset</button>
+  <button @click="{{handleRemove}}">Remove</button>
+  <button @click="{{handleClear}}">Clear</button>
+</div>
