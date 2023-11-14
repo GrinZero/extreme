@@ -88,5 +88,5 @@ export const List = (element: HTMLElement) => {
     },
   });
 
-  return;
+  return list;
 };

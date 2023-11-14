@@ -12,6 +12,7 @@
       "persistent": true
     },
     "demo#dev": { "dependsOn": ["vite-raw-minify-plugin#build"] },
-    "test": {}
+    "test": {},
+    "demo#build": { "dependsOn": ["vite-raw-minify-plugin#build"] }
   }
 }
