@@ -5,7 +5,7 @@ import { resolve } from "path";
 
 export default defineConfig(({ mode }) => ({
   plugins: [rawMinifyPlugin()],
-  // base: mode === "production" ? "/exterme/" : "/",
+  base: mode === "production" ? "/extreme/" : "/",
   resolve: {
     alias: {
       "@": resolve(__dirname, "src"),
