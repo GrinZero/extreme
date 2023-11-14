@@ -198,16 +198,14 @@ export const useTemplate = (
                 if (!id) continue;
                 const index = newIDList.indexOf(id);
                 const oldIndex = oldIDList.indexOf(id);
+                const renderDom = newListRender[index];
+                const oldDom = oldListRender[index];
                 if (index === oldIndex) {
                   // 位置正确，不需要移动
-                  const renderDom = newListRender[index];
-                  const oldDom = oldListRender[index];
-                  if (renderDom !== oldDom) {
+                  if (renderDom !== oldDom && renderDom) {
                     childNode.outerHTML = renderDom;
                   }
                 } else {
-                  const renderDom = newListRender[index];
-                  const oldDom = oldListRender[oldIndex];
                   const nextIndexElement = parent.children[index + 1];
                   if (index > oldIndex) {
                     if (nextIndexElement) {
@@ -218,7 +216,7 @@ export const useTemplate = (
                   } else {
                     parent.insertBefore(childNode, nextIndexElement);
                   }
-                  if (renderDom !== oldDom) {
+                  if (renderDom !== oldDom && renderDom) {
                     childNode.outerHTML = renderDom;
                   }
                 }
