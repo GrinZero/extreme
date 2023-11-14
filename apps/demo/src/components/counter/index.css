@@ -1,3 +1,9 @@
 .hello-world {
   color: red;
 }
+.github-icon{
+  background-color: white;
+  border-radius: 100%;
+  overflow: hidden;
+  border: 1px solid #ccc;
+}

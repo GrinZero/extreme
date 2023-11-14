@@ -95,14 +95,11 @@ export const useTemplate = (
   // 第一阶段，为所有使用了{{}}的dom添加id，或者对id="{{ref}}"的dom进行替换
   {
     const usageDomSet = new Set<string>();
-    const usageDomArr = template.match(/{{(.*?)}}/g);
-    if (usageDomArr) {
-      for (let i = 0; i < usageDomArr.length; i++) {
-        const usageDom = usageDomArr[i];
-        const dom = findDomStr(template.indexOf(usageDom), template);
-        usageDomSet.add(dom);
-      }
-    }
+    template.replace(/{{(.*?)}}/g, (_, _key, start) => {
+      const dom = findDomStr(start, template);
+      usageDomSet.add(dom);
+      return _;
+    });
     usageDomSet.forEach((dom) => {
       let id = "";
       if (dom.indexOf("id=") === -1) {
@@ -192,46 +189,66 @@ export const useTemplate = (
             const newIDList = newListRender.map((item) => getDomID(item));
             // 处理新增、移动、修改、删除的情况，确保顺序和位置正确，且最小化dom操作
             const childNodes = Array.from(parent.children);
-
-            console.log("childNodes", childNodes, newListRender);
             const useagNewIDList = new Set(newIDList);
-            for (let i = 0; i < childNodes.length; i++) {
-              const childNode = childNodes[i];
-              const id = childNode.id;
-              if (!id) continue;
-              const index = newIDList.indexOf(id);
-              if (index === -1) {
-                // 删除
-                childNode.remove();
-                continue;
-              }
-
-              const oldIndex = oldIDList.indexOf(id);
-              if (index === oldIndex) {
-                // 位置正确，不需要移动
-                const renderDom = newListRender[index];
-                const oldDom = oldListRender[index];
-                if (renderDom !== oldDom) {
-                  // 修改
-                  childNode.outerHTML = renderDom;
-                  useagNewIDList.delete(id);
+            if (newIDList.length > 0) {
+              // 移动、修改
+              for (let i = 0; i < childNodes.length; i++) {
+                const childNode = childNodes[i];
+                const id = childNode.id;
+                if (!id) continue;
+                const index = newIDList.indexOf(id);
+                const oldIndex = oldIDList.indexOf(id);
+                if (index === oldIndex) {
+                  // 位置正确，不需要移动
+                  const renderDom = newListRender[index];
+                  const oldDom = oldListRender[index];
+                  if (renderDom !== oldDom) {
+                    childNode.outerHTML = renderDom;
+                  }
+                } else {
+                  const renderDom = newListRender[index];
+                  const oldDom = oldListRender[oldIndex];
+                  const nextIndexElement = parent.children[index + 1];
+                  if (index > oldIndex) {
+                    if (nextIndexElement) {
+                      parent.insertBefore(childNode, nextIndexElement);
+                    } else {
+                      parent.appendChild(childNode);
+                    }
+                  } else {
+                    parent.insertBefore(childNode, nextIndexElement);
+                  }
+                  if (renderDom !== oldDom) {
+                    childNode.outerHTML = renderDom;
+                  }
                 }
-              } else {
-                const renderDom = newListRender[index];
-                const oldDom = oldListRender[oldIndex];
-                if (renderDom === oldDom) {
-                  // 移动到index位置
-                  parent.insertBefore(childNode, parent.children[index]);
-                  childNode.remove();
-                  useagNewIDList.delete(id);
-                }else{
-                  // 修改并移动
-                  childNode.outerHTML = renderDom;
-                  parent.insertBefore(childNode, parent.children[index]);
-                  useagNewIDList.delete(id);
-                }
+                useagNewIDList.delete(id);
               }
+              // 新增
+              useagNewIDList.forEach((id) => {
+                const index = newIDList.indexOf(id);
+                const renderDom = newListRender[index];
+                const nextIndexElement = parent.children[index + 1];
+                const tmp = document.createElement("template");
+                tmp.innerHTML = renderDom;
+                const renderDomNode = tmp.content;
+                if (nextIndexElement) {
+                  parent.insertBefore(renderDomNode, nextIndexElement);
+                } else {
+                  parent.appendChild(renderDomNode);
+                }
+              });
             }
+
+            // 删除
+            oldIDList.forEach((id) => {
+              if (newIDList.indexOf(id) === -1 && id) {
+                const dom = document.getElementById(id);
+                if (dom) {
+                  dom.remove();
+                }
+              }
+            });
           });
           const listDom = render(data);
           forTasks.push([
@@ -247,7 +264,6 @@ export const useTemplate = (
     }
   }
 
-  console.log("template", template);
   let templateStr = template;
   const baseTemplate = template.replace(/{{(.*?)}}/g, (source, key, start) => {
     if (!state) return `[without state "${key}"]`;
@@ -330,10 +346,20 @@ export const useTemplate = (
     });
     element.addEventListener(event, (e) => {
       const target = e.target as HTMLElement;
-      if (!target.id) return;
-      const fn = fnMap.get(target.id);
-      if (fn) {
-        fn(e);
+      if (target.id) {
+        const fn = fnMap.get(target.id);
+        if (fn) {
+          fn(e);
+        }
+        return;
+      }
+      for (const [id, fn] of fnMap) {
+        const dom = document.getElementById(id);
+        if (!dom) continue;
+        if (dom.contains(target) && fn) {
+          fn(e);
+          return;
+        }
       }
     });
   });

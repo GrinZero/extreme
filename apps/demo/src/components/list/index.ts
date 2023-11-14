@@ -28,9 +28,21 @@ export const List = (element: HTMLElement) => {
     setData(defaultData);
   };
   const handleAdd = () => {
-    setData([...data(), defaultData[0]]);
+    const source = data();
+
+    const newKey =
+      source.length > 0 ? Math.max(...source.map((item) => item.key)) + 1 : 1;
+    setData([
+      ...data(),
+      {
+        src: "https://img.alicdn.com/imgextra/i4/O1CN01QYQ1QI1CZQYQ1QYQI_!!6000000001382-2-tps-200-200.png",
+        content: "这是一段描述",
+        title: "这是一段标题",
+        key: newKey,
+      },
+    ]);
   };
-  const handleRemove=()=>{
+  const handleMove = () => {
     setData([
       {
         src: "https://img.alicdn.com/imgextra/i4/O1CN01QYQ1QI1CZQYQ1QYQI_!!6000000001382-2-tps-200-200.png",
@@ -44,8 +56,24 @@ export const List = (element: HTMLElement) => {
         title: "这是一段标题1",
         key: 1,
       },
-    ])
-  }
+    ]);
+  };
+  const handleUpdate = () => {
+    setData([
+      {
+        src: "https://img.alicdn.com/imgextra/i4/O1CN01QYQ1QI1CZQYQ1QYQI_!!6000000001382-2-tps-200-200.png",
+        content: "这是一段描述111[key没有变化]",
+        title: "这是一段标题111",
+        key: 1,
+      },
+      {
+        src: "https://img.alicdn.com/imgextra/i4/O1CN01QYQ1QI1CZQYQ1QYQI_!!6000000001382-2-tps-200-200.png",
+        content: "这是一段描述",
+        title: "这是一段标题",
+        key: 2,
+      },
+    ]);
+  };
 
   const list = useTemplate(element, template, {
     state: {
@@ -55,7 +83,8 @@ export const List = (element: HTMLElement) => {
       handleClear,
       handleReset,
       handleAdd,
-      handleRemove
+      handleMove,
+      handleUpdate,
     },
   });
 
