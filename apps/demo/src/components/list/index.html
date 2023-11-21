@@ -1,4 +1,4 @@
-<div>
+<div class="list-container">
   <h1>
     List
     <a
@@ -28,7 +28,14 @@
   </ul>
   <button @click="{{handleAdd}}">Add</button>
   <button @click="{{handleUpdate}}">Update</button>
-  <button @click="{{handleReset}}">Reset</button>
   <button @click="{{handleMove}}">Move</button>
   <button @click="{{handleClear}}">Clear</button>
+  <button
+    @click="{{handleReset}}"
+    class="reset-icon"
+    :if="{{showReset}}"
+    title="Reset"
+  >
+    x
+  </button>
 </div>

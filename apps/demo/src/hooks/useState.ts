@@ -14,7 +14,13 @@ export const useState = <T = unknown>(value: T) => {
     if (_value === value) return;
     const oldV = _value;
     _value = value;
-    set.forEach((fn) => fn(_value, oldV));
+    set.forEach((fn) => {
+      if (requestIdleCallback) {
+        requestIdleCallback(() => fn(_value, oldV));
+      } else {
+        fn(_value, oldV);
+      }
+    });
   };
   return [getValue, setValue] as const;
 };

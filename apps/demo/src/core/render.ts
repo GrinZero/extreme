@@ -1,11 +1,18 @@
-import { useID } from "./useID";
-import type { Ref } from "./useRef";
+import type { Ref } from "../hooks";
+import {
+  findDomStr,
+  getDomID,
+  addDomID,
+  getRandomID,
+  getHash,
+} from "./dom-str";
 
 export interface TemplateProps {
   state?: Record<string, any> | null;
   ref?: Record<string, Ref> | null;
   methods?: Record<string, Function> | null;
 }
+export type Updater = (newData?: unknown, oldData?: unknown) => void;
 
 const getValue = (state: Record<string, any>, key: string) => {
   const _key = key.trim();
@@ -22,65 +29,8 @@ const getValue = (state: Record<string, any>, key: string) => {
   }
 };
 
-function findDomStr(index: number, htmlText: string) {
-  let firstDOMIndex = index;
-  for (let i = index; i >= 0; i--) {
-    if (htmlText[i] === "<") {
-      firstDOMIndex = i;
-      break;
-    }
-  }
-
-  let tag = "";
-  for (let i = firstDOMIndex; i < htmlText.length; i++) {
-    if (htmlText[i] === " " || htmlText[i] === ">" || htmlText[i] === "/") {
-      tag = htmlText.slice(firstDOMIndex, i + 1);
-      tag = tag.replace(/(<|>|\/)/g, "").trim();
-      break;
-    }
-  }
-  let lastIndex = index;
-  findLastIndex: for (let i = index; i < htmlText.length; i++) {
-    if (htmlText[i] === "<" && htmlText[i + 1] === "/") {
-      for (let j = i; j < htmlText.length; j++) {
-        if (htmlText[j] === ">") {
-          const endTag = htmlText.slice(i + 2, j);
-          if (endTag !== tag) {
-            continue;
-          }
-          lastIndex = j + 1;
-          break findLastIndex;
-        }
-      }
-    }
-    if (htmlText[i] === "/" && htmlText[i + 1] === ">") {
-      lastIndex = i + 2;
-      break;
-    }
-  }
-  return htmlText.slice(firstDOMIndex, lastIndex);
-}
-
-const getDomID = (domStr: string) => {
-  const id = domStr.match(/id="(.*?)"/)?.[1];
-  return id;
-};
-const addDomID = (domStr: string, newID: string) => {
-  let id = "";
-  const firstEndIndex = domStr.indexOf(">");
-  const idIndex = domStr.indexOf("id=");
-  if (idIndex === -1 || idIndex > firstEndIndex) {
-    id = newID;
-    domStr = domStr.replace(">", ` id="${id}">`);
-  } else {
-    id = domStr.match(/id="(.*?)"/)?.[1] || useID();
-  }
-  return [domStr, id];
-};
-const getHash = (str: string) => "W" + str.charCodeAt(0).toString(16);
-
-export const useTemplate = (
-  element: HTMLElement,
+export const render = <T extends HTMLElement>(
+  element: T,
   template: string,
   props: TemplateProps = {
     state: null,
@@ -103,7 +53,7 @@ export const useTemplate = (
     usageDomSet.forEach((dom) => {
       let id = "";
       if (dom.indexOf("id=") === -1) {
-        id = useID();
+        id = getRandomID();
         const newDom = dom.replace(">", ` id="${id}">`);
         template = template.replace(dom, newDom);
       }
@@ -117,7 +67,6 @@ export const useTemplate = (
       return _;
     });
   }
-
   // 第二阶段，收集所有methods和对应的DOM节点
   const methodsMap = new Map<string, [string, Function][]>();
   {
@@ -141,9 +90,60 @@ export const useTemplate = (
   // 第三阶段，识别:for和:if
   {
     if (state) {
+      // :if
+      const ifTasks: [string, string][] = [];
+      template = template.replace(/:if="{{(.*?)}}"/g, (_, key, start) => {
+        const baseDom = findDomStr(start, template);
+        const dom = baseDom.replace(_, "");
+        const value = getValue(state, key);
+        const id = getDomID(baseDom)!;
+        const addTask = (value: boolean) => {
+          if (value) {
+            ifTasks.push([baseDom, dom]);
+          }
+          ifTasks.push([baseDom, ""]);
+        };
+
+        if (typeof value === "function") {
+          let sibling: null | Element = null;
+          let parent: null | Element = null;
+          let open: boolean;
+          const data = value(() => {
+            const newOpen = value();
+            if (newOpen === open) return;
+            if (newOpen) {
+              // 还原到初始状态并插入到原本的位置
+              const tmp = document.createElement("template");
+              const d = render(tmp, dom, props);
+              const content = d.content.cloneNode(true);
+              if (sibling && parent) {
+                parent.insertBefore(sibling, content);
+              } else if (!sibling && parent) {
+                parent.appendChild(content);
+              }
+            } else {
+              const element = document.getElementById(id);
+              if (!element) return;
+              sibling = sibling || element.nextElementSibling;
+              parent = parent || element.parentElement;
+              element.remove();
+            }
+            open = newOpen;
+          });
+          addTask(data);
+          return _;
+        }
+
+        addTask(value);
+        return _;
+      });
+      ifTasks.forEach(([baseDom, newDom]) => {
+        template = template.replace(baseDom, newDom);
+      });
+
+      // :for
       const forTasks: [string, string][] = [];
       template = template.replace(/:for="(.*?)"/g, (_, key, start) => {
-        if (!state) return _;
         const [itemName, listName] = key
           .trim()
           .split(" in ")
@@ -153,7 +153,7 @@ export const useTemplate = (
         const dom = baseDom.replace(_, "");
 
         const parentDom = findDomStr(template.indexOf(baseDom) - 1, template);
-        const [newParentDOM, parentID] = addDomID(parentDom, useID());
+        const [newParentDOM, parentID] = addDomID(parentDom, getRandomID());
 
         const list = getValue(state, listName);
 
@@ -303,10 +303,10 @@ export const useTemplate = (
 
       let id = "";
       if (baseDomStr.indexOf("id=") === -1) {
-        id = useID();
+        id = getRandomID();
         baseDomStr = baseDomStr.replace(">", ` id="${id}">`);
       } else {
-        id = baseDomStr.match(/id="(.*?)"/)?.[1] || useID();
+        id = baseDomStr.match(/id="(.*?)"/)?.[1] || getRandomID();
       }
 
       const update = () => {

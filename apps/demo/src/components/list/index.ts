@@ -1,4 +1,5 @@
-import { useStyles, useTemplate, useState, useRef } from "@/hooks";
+import { useStyles, useState, useRef } from "@/hooks";
+import { render, Updater } from "@/core";
 import styles from "./index.css?raw";
 import template from "./index.html?raw";
 
@@ -81,9 +82,10 @@ export const List = (element: HTMLElement) => {
     ]);
   };
 
-  const list = useTemplate(element, template, {
+  const list = render(element, template, {
     state: {
       items: data,
+      showReset: (fn: Updater) => data(fn).length > 0,
     },
     methods: {
       handleClear,

@@ -2,3 +2,18 @@
   height: 144px;
   overflow: auto;
 }
+.list-container{
+  position: relative;
+}
+
+.reset-icon{
+  position: absolute;
+  right: 0px;
+  top: 0px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  line-height: .2;
+  padding: 0;
+  border-color: aliceblue;
+}

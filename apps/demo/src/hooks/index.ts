@@ -1,5 +1,4 @@
 export * from "./useStyles"
-export * from "./useTemplate"
 export * from "./useID"
 export * from "./useRef"
 export * from "./useState"

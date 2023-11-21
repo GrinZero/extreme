@@ -1,4 +1,5 @@
-import { useStyles, useTemplate, useRef, useState, useEffect } from "@/hooks";
+import { useStyles, useRef, useState, useEffect } from "@/hooks";
+import { render } from "@/core";
 import styles from "./index.css?raw";
 import template from "./index.html?raw";
 
@@ -18,7 +19,7 @@ export const Counter = (element: HTMLElement) => {
     setTitle("submit success");
   };
 
-  const base = useTemplate(element, template, {
+  const base = render(element, template, {
     state: {
       count,
       title,
