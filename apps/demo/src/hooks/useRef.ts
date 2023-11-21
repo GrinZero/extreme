@@ -1,4 +1,4 @@
-import { useID } from "./useID";
+import { getRandomID } from "../core/dom-str";
 
 export type Ref = {
   (): HTMLElement | null;
@@ -6,7 +6,7 @@ export type Ref = {
 };
 
 export const useRef = (): Ref => {
-  const id = useID();
+  const id = getRandomID();
   const fn = () => document.getElementById(id);
   fn.toString = () => id;
   return fn;

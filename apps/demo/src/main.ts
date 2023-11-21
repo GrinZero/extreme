@@ -1,7 +1,15 @@
 import "./style.css";
 import typescriptLogo from "./typescript.svg";
 import viteLogo from "/vite.svg";
-import { Counter, List } from "./components";
+import { Counter, List, CustomComponent } from "./components";
+
+import { extreme } from "./core";
+
+extreme.use({
+  Counter,
+  List,
+  CustomComponent
+});
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -22,4 +30,4 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   </div>
 `;
 Counter(document.querySelector<HTMLButtonElement>("#counter")!);
-List(document.querySelector<HTMLButtonElement>("#list")!);
+CustomComponent(document.querySelector<HTMLButtonElement>("#list")!);

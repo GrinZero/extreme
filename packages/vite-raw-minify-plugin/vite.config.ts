@@ -10,10 +10,11 @@ export default defineConfig({
     },
     outDir: "dist",
     rollupOptions: {
-      external: ["html-minifier"],
+      external: ["html-minifier", "csso"],
       output: {
         globals: {
           "html-minifier": "HTMLMinifier",
+          csso: "csso",
         },
       },
     },

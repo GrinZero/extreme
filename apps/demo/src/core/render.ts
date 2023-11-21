@@ -6,6 +6,7 @@ import {
   getRandomID,
   getHash,
 } from "./dom-str";
+import { extreme } from "./extreme";
 
 export interface TemplateProps {
   state?: Record<string, any> | null;
@@ -35,12 +36,33 @@ export const render = <T extends HTMLElement>(
   props: TemplateProps = {
     state: null,
     ref: null,
-  }
+  },
+  replace: boolean = true
 ) => {
   const { state, ref, methods } = props;
 
   const stateSet = new Set<string>();
   const refSet = new Set<string>();
+  const customJobs: [string, Function][] = [];
+
+  // 递归阶段，将所有大写开头的DOM做处理
+  {
+    const customTasks: [string, string][] = [];
+    template.replace(/<[A-Z].*?[\/\>\s]/g, (source, index) => {
+      if (!extreme.store) return source;
+      const componentName = source.slice(1, source.length - 1);
+      const dom = findDomStr(index, template);
+      const fn = extreme.store[componentName];
+      const id = getRandomID();
+      const newDom = `<div id="${id}"></div>`;
+      customTasks.push([dom, newDom]);
+      customJobs.push([id, fn]);
+      return source;
+    });
+    customTasks.forEach(([dom, newDom]) => {
+      template = template.replace(dom, newDom);
+    });
+  }
 
   // 第一阶段，为所有使用了{{}}的dom添加id，或者对id="{{ref}}"的dom进行替换
   {
@@ -342,7 +364,7 @@ export const render = <T extends HTMLElement>(
     arr.forEach(([id, fn]) => {
       fnMap.set(id, fn);
     });
-    element.addEventListener(event, (e) => {
+    element.firstChild!.addEventListener(event, (e) => {
       const target = e.target as HTMLElement;
       if (target.id) {
         const fn = fnMap.get(target.id);
@@ -360,6 +382,28 @@ export const render = <T extends HTMLElement>(
         }
       }
     });
+  });
+
+  {
+    if (replace) {
+      const parent = element.parentElement;
+      if (element && parent && element.firstChild) {
+        const firstChild = element.firstChild;
+        parent.replaceChild(firstChild, element);
+      }
+    }
+  }
+
+  customJobs.forEach(([id, fn]) => {
+    const element = document.getElementById(id);
+    const parent = element?.parentElement;
+    if (element && parent) {
+      const newElement: HTMLElement = fn(element);
+      if (newElement.firstChild) {
+        const firstChild = newElement.firstChild;
+        parent.replaceChild(firstChild, newElement);
+      }
+    }
   });
 
   return element;

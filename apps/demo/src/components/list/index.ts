@@ -17,10 +17,15 @@ const defaultData = [
     key: 2,
   },
 ];
-export const List = (element: HTMLElement) => {
+export const List = (
+  element: HTMLElement,
+  props: {
+    defaultData?: typeof defaultData;
+  } = {}
+) => {
   useStyles(styles);
 
-  const [data, setData] = useState(defaultData);
+  const [data, setData] = useState(props.defaultData || defaultData);
   const listRef = useRef();
 
   const handleClear = () => {
