@@ -25,6 +25,8 @@ export const List = (
 ) => {
   useStyles(styles);
 
+  console.log("props",props)
+
   const [data, setData] = useState(props.defaultData || defaultData);
   const listRef = useRef();
 

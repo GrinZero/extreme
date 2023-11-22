@@ -36,6 +36,7 @@ export const render = <T extends HTMLElement>(
   props: TemplateProps = {
     state: null,
     ref: null,
+    methods: null,
   },
   replace: boolean = true
 ) => {
@@ -43,20 +44,59 @@ export const render = <T extends HTMLElement>(
 
   const stateSet = new Set<string>();
   const refSet = new Set<string>();
-  const customJobs: [string, Function][] = [];
+  const customJobs: [string, Function, Record<string, unknown>][] = [];
 
   // 递归阶段，将所有大写开头的DOM做处理
   {
     const customTasks: [string, string][] = [];
-    template.replace(/<[A-Z].*?[\/\>\s]/g, (source, index) => {
+    template.replace(/<([A-Z].*?)[\/\>\s]/g, (source, name, start) => {
       if (!extreme.store) return source;
-      const componentName = source.slice(1, source.length - 1);
-      const dom = findDomStr(index, template);
+      const componentName = name.trim();
+      const dom = findDomStr(start, template);
       const fn = extreme.store[componentName];
-      const id = getRandomID();
-      const newDom = `<div id="${id}"></div>`;
+      const props: Record<string, unknown> = {};
+
+      dom.replace(/[\s](.*?)="{{(.*?)}}"/g, (_, _attrKey, _valueKey) => {
+        const attrName = _attrKey.trim();
+        const valueKey = _valueKey.trim();
+
+        if (attrName === "id" && ref && valueKey in ref) {
+          props[attrName] = ref[valueKey];
+          return _;
+        }
+
+        if(attrName.startsWith(":")){
+          props[attrName] = `{{${valueKey}}}`;
+          return _;
+        }
+
+        if (state && valueKey in state && !attrName.startsWith("@")) {
+          props[attrName] = state[valueKey];
+          return _;
+        }
+        return _;
+      });
+
+      const id = (props.id as string) || getRandomID();
+      let newDom = `<div id="${id}"`;
+      if (":if" in props) {
+        newDom += ` :if="${props[":if"]}"`;
+        delete props[":if"];
+      }
+      if (":for" in props) {
+        newDom += ` :for="${props[":for"]}"`;
+        delete props[":for"];
+      }
+      Object.keys(props).forEach((key) => {
+        if(key.startsWith("@")) {
+          newDom += ` ${key}="${props[key]}"`;
+          delete props[key];
+        }
+      })
+
+      newDom += `></div>`;
       customTasks.push([dom, newDom]);
-      customJobs.push([id, fn]);
+      customJobs.push([id, fn, props]);
       return source;
     });
     customTasks.forEach(([dom, newDom]) => {
@@ -130,6 +170,7 @@ export const render = <T extends HTMLElement>(
           let sibling: null | Element = null;
           let parent: null | Element = null;
           let open: boolean;
+          debugger
           const data = value(() => {
             const newOpen = value();
             if (newOpen === open) return;
@@ -394,11 +435,11 @@ export const render = <T extends HTMLElement>(
     }
   }
 
-  customJobs.forEach(([id, fn]) => {
+  customJobs.forEach(([id, fn, props]) => {
     const element = document.getElementById(id);
     const parent = element?.parentElement;
     if (element && parent) {
-      const newElement: HTMLElement = fn(element);
+      const newElement: HTMLElement = fn(element, props);
       if (newElement.firstChild) {
         const firstChild = newElement.firstChild;
         parent.replaceChild(firstChild, newElement);

@@ -7,3 +7,10 @@
   overflow: hidden;
   border: 1px solid #ccc;
 }
+.counter{
+  padding: 2em;
+  padding: 0.6em 1.2em;
+  background-color: #1a1a1a;
+  border-radius: 12px;
+  height: fit-content;
+}

@@ -57,7 +57,13 @@ h1 {
 }
 
 .card {
-  padding: 2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.25s;
+  display: flex;
+  gap: 12px;
 }
 
 .read-the-docs {

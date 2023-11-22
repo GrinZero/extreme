@@ -1,7 +1,13 @@
 import { render } from "@/core";
+import { GetState, useRef } from "@/hooks";
 import template from "./index.html?raw";
 
-export const CustomComponent = (element: HTMLElement) => {
+export const CustomComponent = (
+  element: HTMLElement,
+  props: {
+    open?: boolean | GetState<boolean>;
+  } = {}
+) => {
   const defaultData = [
     {
       src: "https://img.alicdn.com/imgextra/i4/O1CN01QYQ1QI1CZQYQ1QYQI_!!6000000001382-2-tps-200-200.png",
@@ -16,10 +22,17 @@ export const CustomComponent = (element: HTMLElement) => {
       key: 2,
     },
   ];
+  const divRef = useRef();
 
-  return render(element, template, {
+  render(element, template, {
     state: {
       defaultData,
+      open: props.open,
+    },
+    ref: {
+      divRef,
     },
   });
+
+  console.log(divRef());
 };

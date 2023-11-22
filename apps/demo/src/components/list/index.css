@@ -4,12 +4,16 @@
 }
 .list-container{
   position: relative;
+  padding: 2em;
+  padding: 0.6em 1.2em;
+  background-color: #1a1a1a;
+  border-radius: 12px;
 }
 
 .reset-icon{
   position: absolute;
-  right: 0px;
-  top: 0px;
+  right: 16px;
+  top: 16px;
   cursor: pointer;
   width: 32px;
   height: 32px;

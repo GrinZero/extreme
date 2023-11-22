@@ -4,11 +4,12 @@ import viteLogo from "/vite.svg";
 import { Counter, List, CustomComponent } from "./components";
 
 import { extreme } from "./core";
+import { useState } from "./hooks";
 
 extreme.use({
   Counter,
   List,
-  CustomComponent
+  CustomComponent,
 });
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -25,9 +26,16 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
       <button id="list" type="button"></button>
     </div>
     <p class="read-the-docs">
-      Click on the Vite and TypeScript logos to learn more
+      open list
     </p>
   </div>
 `;
 Counter(document.querySelector<HTMLButtonElement>("#counter")!);
-CustomComponent(document.querySelector<HTMLButtonElement>("#list")!);
+
+const [open, setOpen] = useState(false);
+
+CustomComponent(document.querySelector<HTMLButtonElement>("#list")!, { open });
+
+document.querySelector(".read-the-docs")!.addEventListener("click", () => {
+  setOpen(true);
+});
