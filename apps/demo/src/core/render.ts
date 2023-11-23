@@ -39,70 +39,12 @@ export const render = <T extends HTMLElement>(
     methods: null,
   },
   replace: boolean = true
-) => {
+): T => {
   const { state, ref, methods } = props;
 
   const stateSet = new Set<string>();
   const refSet = new Set<string>();
   const customJobs: [string, Function, Record<string, unknown>][] = [];
-
-  // 递归阶段，将所有大写开头的DOM做处理
-  {
-    const customTasks: [string, string][] = [];
-    template.replace(/<([A-Z].*?)[\/\>\s]/g, (source, name, start) => {
-      if (!extreme.store) return source;
-      const componentName = name.trim();
-      const dom = findDomStr(start, template);
-      const fn = extreme.store[componentName];
-      const props: Record<string, unknown> = {};
-
-      dom.replace(/[\s](.*?)="{{(.*?)}}"/g, (_, _attrKey, _valueKey) => {
-        const attrName = _attrKey.trim();
-        const valueKey = _valueKey.trim();
-
-        if (attrName === "id" && ref && valueKey in ref) {
-          props[attrName] = ref[valueKey];
-          return _;
-        }
-
-        if(attrName.startsWith(":")){
-          props[attrName] = `{{${valueKey}}}`;
-          return _;
-        }
-
-        if (state && valueKey in state && !attrName.startsWith("@")) {
-          props[attrName] = state[valueKey];
-          return _;
-        }
-        return _;
-      });
-
-      const id = (props.id as string) || getRandomID();
-      let newDom = `<div id="${id}"`;
-      if (":if" in props) {
-        newDom += ` :if="${props[":if"]}"`;
-        delete props[":if"];
-      }
-      if (":for" in props) {
-        newDom += ` :for="${props[":for"]}"`;
-        delete props[":for"];
-      }
-      Object.keys(props).forEach((key) => {
-        if(key.startsWith("@")) {
-          newDom += ` ${key}="${props[key]}"`;
-          delete props[key];
-        }
-      })
-
-      newDom += `></div>`;
-      customTasks.push([dom, newDom]);
-      customJobs.push([id, fn, props]);
-      return source;
-    });
-    customTasks.forEach(([dom, newDom]) => {
-      template = template.replace(dom, newDom);
-    });
-  }
 
   // 第一阶段，为所有使用了{{}}的dom添加id，或者对id="{{ref}}"的dom进行替换
   {
@@ -162,30 +104,36 @@ export const render = <T extends HTMLElement>(
         const addTask = (value: boolean) => {
           if (value) {
             ifTasks.push([baseDom, dom]);
+            return;
           }
-          ifTasks.push([baseDom, ""]);
+          ifTasks.push([baseDom, `<template id="${id}"></template>`]);
         };
 
         if (typeof value === "function") {
           let sibling: null | Element = null;
           let parent: null | Element = null;
           let open: boolean;
-          debugger
+
           const data = value(() => {
             const newOpen = value();
             if (newOpen === open) return;
+            const element = document.getElementById(id);
+            if (!sibling && !parent && element) {
+              sibling = element.nextElementSibling;
+              parent = element.parentElement;
+            }
             if (newOpen) {
               // 还原到初始状态并插入到原本的位置
               const tmp = document.createElement("template");
               const d = render(tmp, dom, props);
               const content = d.content.cloneNode(true);
+
               if (sibling && parent) {
                 parent.insertBefore(sibling, content);
               } else if (!sibling && parent) {
                 parent.appendChild(content);
               }
             } else {
-              const element = document.getElementById(id);
               if (!element) return;
               sibling = sibling || element.nextElementSibling;
               parent = parent || element.parentElement;
@@ -193,6 +141,7 @@ export const render = <T extends HTMLElement>(
             }
             open = newOpen;
           });
+          open = data;
           addTask(data);
           return _;
         }
@@ -325,6 +274,64 @@ export const render = <T extends HTMLElement>(
     }
   }
 
+  // 递归阶段，将所有大写开头的DOM做处理
+  {
+    const customTasks: [string, string][] = [];
+    template.replace(/<([A-Z].*?)[\/\>\s]/g, (source, name, start) => {
+      if (!extreme.store) return source;
+      const componentName = name.trim();
+      const dom = findDomStr(start, template);
+      const fn = extreme.store[componentName];
+      const props: Record<string, unknown> = {};
+
+      dom.replace(/[\s](.*?)="{{(.*?)}}"/g, (_, _attrKey, _valueKey) => {
+        const attrName = _attrKey.trim();
+        const valueKey = _valueKey.trim();
+
+        if (attrName === "id" && ref && valueKey in ref) {
+          props[attrName] = ref[valueKey];
+          return _;
+        }
+
+        if (attrName.startsWith(":")) {
+          props[attrName] = `{{${valueKey}}}`;
+          return _;
+        }
+
+        if (state && valueKey in state && !attrName.startsWith("@")) {
+          props[attrName] = state[valueKey];
+          return _;
+        }
+        return _;
+      });
+
+      const id = (props.id as string) || getDomID(dom) || getRandomID();
+      let newDom = `<div id="${id}"`;
+      if (":if" in props) {
+        newDom += ` :if="${props[":if"]}"`;
+        delete props[":if"];
+      }
+      if (":for" in props) {
+        newDom += ` :for="${props[":for"]}"`;
+        delete props[":for"];
+      }
+      Object.keys(props).forEach((key) => {
+        if (key.startsWith("@")) {
+          newDom += ` ${key}="${props[key]}"`;
+          delete props[key];
+        }
+      });
+
+      newDom += `></div>`;
+      customTasks.push([dom, newDom]);
+      customJobs.push([id, fn, props]);
+      return source;
+    });
+    customTasks.forEach(([dom, newDom]) => {
+      template = template.replace(dom, newDom);
+    });
+  }
+
   let templateStr = template;
   const baseTemplate = template.replace(/{{(.*?)}}/g, (source, key, start) => {
     if (!state) return `[without state "${key}"]`;
@@ -397,6 +404,15 @@ export const render = <T extends HTMLElement>(
       templateStr = templateStr.replace(sourceDomStr, newDomStr);
     }
   }
+
+  const parent =
+    element.nodeName === "TEMPLATE"
+      ? (element as unknown as HTMLTemplateElement).content
+      : element.parentElement;
+  const index = parent
+    ? Array.prototype.indexOf.call(parent.children, element)
+    : -1;
+
   element.innerHTML = templateStr;
 
   // 遍历methodsMap，通过事件委托在父节点上绑定事件
@@ -405,7 +421,11 @@ export const render = <T extends HTMLElement>(
     arr.forEach(([id, fn]) => {
       fnMap.set(id, fn);
     });
-    element.firstChild!.addEventListener(event, (e) => {
+    const ele =
+      element.nodeName === "TEMPLATE"
+        ? (element as unknown as HTMLTemplateElement).content
+        : element.firstChild;
+    ele!.addEventListener(event, (e) => {
       const target = e.target as HTMLElement;
       if (target.id) {
         const fn = fnMap.get(target.id);
@@ -427,25 +447,29 @@ export const render = <T extends HTMLElement>(
 
   {
     if (replace) {
-      const parent = element.parentElement;
-      if (element && parent && element.firstChild) {
-        const firstChild = element.firstChild;
-        parent.replaceChild(firstChild, element);
-      }
+      element.replaceWith(element.firstChild!);
+      // const parent = element.parentElement;
+      // if (element && parent && element.firstChild) {
+      //   const firstChild = element.firstChild;
+      //   parent.replaceChild(firstChild, element);
+      // }
     }
   }
 
+  const backElement =
+    index !== -1 && parent ? (parent.children[index] as T) : element;
+
   customJobs.forEach(([id, fn, props]) => {
-    const element = document.getElementById(id);
-    const parent = element?.parentElement;
-    if (element && parent) {
-      const newElement: HTMLElement = fn(element, props);
-      if (newElement.firstChild) {
-        const firstChild = newElement.firstChild;
-        parent.replaceChild(firstChild, newElement);
-      }
+    const ele =
+      backElement.nodeName === "TEMPLATE" || backElement.id === id
+        ? backElement
+        : backElement.querySelector(`#${id}`) || document.getElementById(id);
+    if (ele) {
+      debugger;
+      const newElement: HTMLElement = fn(ele, props);
+      newElement.id = newElement.id || id;
     }
   });
 
-  return element;
+  return backElement;
 };

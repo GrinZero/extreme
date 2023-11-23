@@ -32,10 +32,10 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 `;
 Counter(document.querySelector<HTMLButtonElement>("#counter")!);
 
-const [open, setOpen] = useState(false);
+const [open, setOpen] = useState(true);
 
 CustomComponent(document.querySelector<HTMLButtonElement>("#list")!, { open });
 
 document.querySelector(".read-the-docs")!.addEventListener("click", () => {
-  setOpen(true);
+  setOpen(!open());
 });

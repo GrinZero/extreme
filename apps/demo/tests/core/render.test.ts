@@ -1,5 +1,5 @@
 import { useRef, useState } from "@/hooks";
-import { useTemplate } from "@/hooks/useTemplate";
+import { render } from "@/core";
 import { describe, expect, it, beforeEach, vi } from "vitest";
 
 describe("useTemplate", () => {
@@ -11,7 +11,7 @@ describe("useTemplate", () => {
 
   it("should render a template without state and ref", () => {
     const template = `<p id="first">Hello, {{name}}!</p>`;
-    useTemplate(element, template);
+    render(element, template);
     expect(element.innerHTML).toBe(
       `<p id="first">Hello, [without state "name"]!</p>`
     );
@@ -20,7 +20,7 @@ describe("useTemplate", () => {
   it("should render a template with state", () => {
     const template = `<p id="state">Hello, {{name}}!</p>`;
     const props = { state: { name: "John" } };
-    useTemplate(element, template, props);
+    render(element, template, props);
     expect(element.innerHTML).toBe(`<p id="state">Hello, John!</p>`);
   });
 
@@ -28,7 +28,7 @@ describe("useTemplate", () => {
     const template = '<p id="{{id}}">Hello, {{name}}!</p>';
     const greetingRef = useRef();
     const props = { state: { name: "John" }, ref: { id: greetingRef } };
-    useTemplate(element, template, props);
+    render(element, template, props);
     expect(element.innerHTML).toBe(`<p id="${greetingRef}">Hello, John!</p>`);
 
     expect(greetingRef()).toBe(document.querySelector("p"));
@@ -38,7 +38,7 @@ describe("useTemplate", () => {
     const template = '<button @click="{{onClick}}">Click me</button>';
     const onClick = vi.fn();
     const props = { methods: { onClick } };
-    useTemplate(element, template, props);
+    render(element, template, props);
     const button = element.querySelector("button");
     if (button) {
       button.click();
@@ -54,7 +54,7 @@ describe("useTemplate", () => {
         message,
       },
     };
-    const base = useTemplate(element, template, props);
+    const base = render(element, template, props);
     expect(base.innerHTML).toContain("Hello");
     message((v) => {
       expect(v).toBe("Updated");
