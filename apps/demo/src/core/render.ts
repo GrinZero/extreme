@@ -30,7 +30,7 @@ const getValue = (state: Record<string, any>, key: string) => {
   }
 };
 
-export const render = <T extends HTMLElement>(
+export const render = <T extends HTMLElement | HTMLTemplateElement>(
   element: T,
   template: string,
   props: TemplateProps = {
@@ -39,29 +39,16 @@ export const render = <T extends HTMLElement>(
     methods: null,
   },
   replace: boolean = true
-): T => {
+): T | null | Element => {
   const { state, ref, methods } = props;
 
+  const isTemplateNode = element.nodeName === "TEMPLATE";
   const stateSet = new Set<string>();
   const refSet = new Set<string>();
   const customJobs: [string, Function, Record<string, unknown>][] = [];
 
   // 第一阶段，为所有使用了{{}}的dom添加id，或者对id="{{ref}}"的dom进行替换
   {
-    const usageDomSet = new Set<string>();
-    template.replace(/{{(.*?)}}/g, (_, _key, start) => {
-      const dom = findDomStr(start, template);
-      usageDomSet.add(dom);
-      return _;
-    });
-    usageDomSet.forEach((dom) => {
-      let id = "";
-      if (dom.indexOf("id=") === -1) {
-        id = getRandomID();
-        const newDom = dom.replace(">", ` id="${id}">`);
-        template = template.replace(dom, newDom);
-      }
-    });
     template = template.replace(/id="{{(.*?)}}"/g, (_, key) => {
       const _key = key.trim();
       if (ref && _key in ref) {
@@ -126,7 +113,7 @@ export const render = <T extends HTMLElement>(
               // 还原到初始状态并插入到原本的位置
               const tmp = document.createElement("template");
               const d = render(tmp, dom, props);
-              const content = d.content.cloneNode(true);
+              const content = d as Element;
 
               if (sibling && parent) {
                 parent.insertBefore(sibling, content);
@@ -284,26 +271,29 @@ export const render = <T extends HTMLElement>(
       const fn = extreme.store[componentName];
       const props: Record<string, unknown> = {};
 
-      dom.replace(/[\s](.*?)="{{(.*?)}}"/g, (_, _attrKey, _valueKey) => {
-        const attrName = _attrKey.trim();
-        const valueKey = _valueKey.trim();
+      dom.replace(
+        /(\w+)\s*=\s*["']\{\{([^{}]+)\}\}["']/g,
+        (_, _attrKey, _valueKey) => {
+          const attrName = _attrKey.trim();
+          const valueKey = _valueKey.trim();
 
-        if (attrName === "id" && ref && valueKey in ref) {
-          props[attrName] = ref[valueKey];
+          if (attrName === "id" && ref && valueKey in ref) {
+            props[attrName] = ref[valueKey];
+            return _;
+          }
+
+          if (attrName.startsWith(":")) {
+            props[attrName] = `{{${valueKey}}}`;
+            return _;
+          }
+
+          if (state && valueKey in state && !attrName.startsWith("@")) {
+            props[attrName] = state[valueKey];
+            return _;
+          }
           return _;
         }
-
-        if (attrName.startsWith(":")) {
-          props[attrName] = `{{${valueKey}}}`;
-          return _;
-        }
-
-        if (state && valueKey in state && !attrName.startsWith("@")) {
-          props[attrName] = state[valueKey];
-          return _;
-        }
-        return _;
-      });
+      );
 
       const id = (props.id as string) || getDomID(dom) || getRandomID();
       let newDom = `<div id="${id}"`;
@@ -405,15 +395,43 @@ export const render = <T extends HTMLElement>(
     }
   }
 
-  const parent =
-    element.nodeName === "TEMPLATE"
-      ? (element as unknown as HTMLTemplateElement).content
-      : element.parentElement;
+  const parent = isTemplateNode
+    ? (element as HTMLTemplateElement).content
+    : element.parentElement;
   const index = parent
     ? Array.prototype.indexOf.call(parent.children, element)
     : -1;
 
   element.innerHTML = templateStr;
+
+  let ele = isTemplateNode
+    ? (element as HTMLTemplateElement).content.firstElementChild
+    : element.firstElementChild;
+
+  const backElement =
+    index !== -1 && parent ? (parent.children[index] as T) : ele;
+
+  // 第四阶段，处理所有自定义组件
+
+  if (backElement) {
+    customJobs.forEach(([id, fn, props]) => {
+      const isRoot =
+        backElement.nodeName === "TEMPLATE" || backElement.id === id;
+      const newEle = isRoot
+        ? backElement
+        : backElement.querySelector(`#${id}`) || document.getElementById(id);
+
+      const isFirst = backElement.firstElementChild === newEle;
+
+      if (newEle) {
+        const newElement: HTMLElement = fn(newEle, props);
+        newElement.id = newElement.id || id;
+        if (isRoot || isFirst) {
+          ele = newElement;
+        }
+      }
+    });
+  }
 
   // 遍历methodsMap，通过事件委托在父节点上绑定事件
   methodsMap.forEach((arr, event) => {
@@ -421,10 +439,6 @@ export const render = <T extends HTMLElement>(
     arr.forEach(([id, fn]) => {
       fnMap.set(id, fn);
     });
-    const ele =
-      element.nodeName === "TEMPLATE"
-        ? (element as unknown as HTMLTemplateElement).content
-        : element.firstChild;
     ele!.addEventListener(event, (e) => {
       const target = e.target as HTMLElement;
       if (target.id) {
@@ -447,29 +461,11 @@ export const render = <T extends HTMLElement>(
 
   {
     if (replace) {
-      element.replaceWith(element.firstChild!);
-      // const parent = element.parentElement;
-      // if (element && parent && element.firstChild) {
-      //   const firstChild = element.firstChild;
-      //   parent.replaceChild(firstChild, element);
-      // }
+      if (!isTemplateNode && element.contains(ele)) {
+        element.replaceWith(ele!);
+      }
     }
   }
 
-  const backElement =
-    index !== -1 && parent ? (parent.children[index] as T) : element;
-
-  customJobs.forEach(([id, fn, props]) => {
-    const ele =
-      backElement.nodeName === "TEMPLATE" || backElement.id === id
-        ? backElement
-        : backElement.querySelector(`#${id}`) || document.getElementById(id);
-    if (ele) {
-      debugger;
-      const newElement: HTMLElement = fn(ele, props);
-      newElement.id = newElement.id || id;
-    }
-  });
-
-  return backElement;
+  return ele;
 };
