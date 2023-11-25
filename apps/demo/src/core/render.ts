@@ -30,6 +30,10 @@ const getValue = (state: Record<string, any>, key: string) => {
   }
 };
 
+export type ExtremeElement<T extends HTMLElement | HTMLTemplateElement> =
+  | T
+  | null
+  | Element;
 export const render = <T extends HTMLElement | HTMLTemplateElement>(
   element: T,
   template: string,
@@ -39,7 +43,7 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
     methods: null,
   },
   replace: boolean = true
-): T | null | Element => {
+): ExtremeElement<T> => {
   const { state, ref, methods } = props;
 
   const isTemplateNode = element.nodeName === "TEMPLATE";

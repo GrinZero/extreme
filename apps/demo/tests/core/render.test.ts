@@ -55,7 +55,7 @@ describe("useTemplate", () => {
       },
     };
     const base = render(element, template, props);
-    expect(base.innerHTML).toContain("Hello");
+    expect(base!.innerHTML).toContain("Hello");
     message((v) => {
       expect(v).toBe("Updated");
     });
