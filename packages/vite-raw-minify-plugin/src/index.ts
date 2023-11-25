@@ -1,7 +1,7 @@
 import { minify as htmlMinify } from "html-minifier";
 import { minify as cssMinify } from "csso";
 
-import { preRender } from "./core";
+// import { preRender } from "./core";
 
 const decode = (src: string) => {
   return src
@@ -49,7 +49,7 @@ function rawMinifyPlugin() {
           keepClosingSlash: true,
           caseSensitive: true,
         });
-        const result = encode(preRender(minifyCode));
+        const result = encode(minifyCode);
         return {
           code: result,
           map: null,
