@@ -47,13 +47,15 @@ describe("useTemplate", () => {
   });
 
   it("should handle state updates", () => {
-    const template = "<p>{{message}}</p>";
+    const template = `<p id="test">{{message}}</p>`;
     const [message, setMessage] = useState("Hello");
     const props = {
       state: {
         message,
       },
     };
+    document.body.appendChild(element);
+
     const base = render(element, template, props);
     expect(base!.innerHTML).toContain("Hello");
     message((v) => {
@@ -61,5 +63,9 @@ describe("useTemplate", () => {
     });
     setMessage("Updated");
     // 没有效果...?
+    setTimeout(()=>{
+      const base2 = document.querySelector("#test");
+      expect(base2!.innerHTML).toContain("Updated");
+    })
   });
 });
