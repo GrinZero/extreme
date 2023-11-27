@@ -1,13 +1,7 @@
 export const getRandomID = () => "W" + Math.random().toString(36).slice(2, 10);
 
 export const findDomStr = (index: number, htmlText: string) => {
-  let firstDOMIndex = index;
-  for (let i = index; i >= 0; i--) {
-    if (htmlText[i] === "<") {
-      firstDOMIndex = i;
-      break;
-    }
-  }
+  let firstDOMIndex = htmlText.lastIndexOf("<", index);
 
   let tag = "";
   for (let i = firstDOMIndex; i < htmlText.length; i++) {
@@ -39,17 +33,14 @@ export const findDomStr = (index: number, htmlText: string) => {
   return htmlText.slice(firstDOMIndex, lastIndex);
 };
 
-export const getDomID = (domStr: string) => {
-  const id = domStr.match(/id="(.*?)"/)?.[1];
-  return id;
-};
+export const getDomID = (domStr: string) => domStr.match(/id="(.*?)"/)?.[1]
 
-export const addDomID = (domStr: string, newID: string) => {
+export const addDomID = (domStr: string, newID: string | (() => string)) => {
   let id = "";
   const firstEndIndex = domStr.indexOf(">");
   const idIndex = domStr.indexOf("id=");
   if (idIndex === -1 || idIndex > firstEndIndex) {
-    id = newID;
+    id = typeof newID === "function" ? newID() : newID;
     domStr = domStr.replace(">", ` id="${id}">`);
   } else {
     id = domStr.match(/id="(.*?)"/)?.[1] || getRandomID();
@@ -57,4 +48,4 @@ export const addDomID = (domStr: string, newID: string) => {
   return [domStr, id];
 };
 
-export const getHash = (str: string) => "W" + btoa(str)
+export const getHash = (str: string) => "W" + btoa(str);

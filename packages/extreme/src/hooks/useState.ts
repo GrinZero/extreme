@@ -1,7 +1,7 @@
 export type GetState<T = unknown> = (fn?: (v?: T, old?: T) => void) => T;
 export type SetState<T = unknown> = (v: T) => void;
 
-const idleCallback =
+export const idleCallback =
   globalThis.requestIdleCallback || ((fn) => setTimeout(fn, 0));
 
 export const useState = <T = unknown>(value: T) => {

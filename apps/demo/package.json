@@ -16,5 +16,8 @@
     "vite": "^4.4.5",
     "vite-raw-minify-plugin": "workspace:*",
     "vitest": "^0.34.6"
+  },
+  "dependencies": {
+    "extreme": "workspace:*"
   }
 }

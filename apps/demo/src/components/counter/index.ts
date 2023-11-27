@@ -1,5 +1,4 @@
-import { useStyles, useRef, useState, useEffect } from "@/hooks";
-import { render } from "@/core";
+import { render, useStyles, useRef, useState, useEffect } from "extreme";
 import styles from "./index.css?raw";
 import template from "./index.html?raw";
 
@@ -46,5 +45,6 @@ export const Counter = (element: HTMLElement) => {
     setCount(0);
     setTitle("the form is not submit");
   });
+
   return base;
 };

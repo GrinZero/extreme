@@ -18,6 +18,10 @@ importers:
         version: registry.npmmirror.com/turbo@1.10.16
 
   apps/demo:
+    dependencies:
+      extreme:
+        specifier: workspace:*
+        version: link:../../packages/extreme
     devDependencies:
       jsdom:
         specifier: ^22.1.0

@@ -48,9 +48,20 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
 
   const isTemplateNode = element.nodeName === "TEMPLATE";
   const stateSet = new Set<string>();
-  const refSet = new Set<string>();
   const customJobs: [string, Function, Record<string, unknown>][] = [];
   const methodsMap = new Map<string, [string, Function][]>();
+
+  const addMethodTask = (methodName: string, funcName: string, dom: string) => {
+    const id = getDomID(dom);
+    if (methods && funcName in methods && id) {
+      const task = [id, methods[funcName]] as [string, Function];
+      if (!methodsMap.has(methodName)) {
+        methodsMap.set(methodName, [task]);
+      } else {
+        methodsMap.get(methodName)!.push(task);
+      }
+    }
+  };
 
   // 第一阶段，为所有使用了{{}}的dom添加id，或者对id="{{ref}}"的dom进行替换
   {
@@ -70,7 +81,6 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
     template = template.replace(/id="{{(.*?)}}"/g, (_, key) => {
       const _key = key.trim();
       if (ref && _key in ref) {
-        refSet.add(_key);
         return `id="${ref[_key]}"`;
       }
       return _;
@@ -81,16 +91,7 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
     template = template.replace(/@(.*?)}}"/g, (_, key, start) => {
       const [methodName, funcName] = key.split(`=\"{{`);
       const dom = findDomStr(start, template);
-      const id = getDomID(dom);
-      if (methods && funcName in methods && id) {
-        if (!methodsMap.has(methodName)) {
-          methodsMap.set(methodName, [[id, methods[funcName]]]);
-        } else {
-          const arr = methodsMap.get(methodName) || [];
-          arr.push([id, methods[funcName]]);
-          methodsMap.set(methodName, arr);
-        }
-      }
+      addMethodTask(methodName, funcName, dom);
       return "";
     });
   }
@@ -105,12 +106,13 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
         const dom = baseDom.replace(_, "");
         const value = getValue(state, key);
         const id = getDomID(baseDom)!;
+
         const addTask = (value: boolean) => {
-          if (value) {
-            ifTasks.push([baseDom, dom]);
-            return;
-          }
-          ifTasks.push([baseDom, `<template id="${id}"></template>`]);
+          const task = [
+            baseDom,
+            value ? dom : `<template id="${id}"></template>`,
+          ] as [string, string];
+          ifTasks.push(task);
         };
 
         if (typeof value === "function") {
@@ -153,9 +155,9 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
         addTask(value);
         return _;
       });
-      ifTasks.forEach(([baseDom, newDom]) => {
+      for (const [baseDom, newDom] of ifTasks) {
         template = template.replace(baseDom, newDom);
-      });
+      }
 
       // :for
       const forTasks: [string, string][] = [];
@@ -169,11 +171,11 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
         const dom = baseDom.replace(_, "");
 
         const parentDom = findDomStr(template.indexOf(baseDom) - 1, template);
-        const [newParentDOM, parentID] = addDomID(parentDom, getRandomID());
+        const [newParentDOM, parentID] = addDomID(parentDom, getRandomID);
 
         const list = getValue(state, listName);
 
-        const render = (data: any[]) => {
+        const renderList = (data: any[]) => {
           const domList = data.map((item: any, index: number) => {
             const listID = getHash(String(item.key ?? index));
             let [newDom] = addDomID(dom, listID);
@@ -185,10 +187,7 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
             });
             newDom = newDom.replace(/{{(.*?)}}/g, (_, key) => {
               const value = getValue(item, key.replace(`${itemName}.`, ""));
-              if (typeof value === "function") {
-                return value();
-              }
-              return value;
+              return typeof value === "function" ? value() : value;
             });
             return newDom;
           });
@@ -199,8 +198,9 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
           const data = list((newList: any[], oldList: any[]) => {
             const parent = document.getElementById(parentID);
             if (!parent) return;
-            const oldListRender = render(oldList);
-            const newListRender = render(newList);
+
+            const oldListRender = renderList(oldList);
+            const newListRender = renderList(newList);
             const oldIDList = oldListRender.map((item) => getDomID(item));
             const newIDList = newListRender.map((item) => getDomID(item));
             // 处理新增、移动、修改、删除的情况，确保顺序和位置正确，且最小化dom操作
@@ -253,18 +253,15 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
                 }
               });
             }
-
             // 删除
-            oldIDList.forEach((id) => {
+            for (const id of oldIDList) {
               if (newIDList.indexOf(id) === -1 && id) {
                 const dom = document.getElementById(id);
-                if (dom) {
-                  dom.remove();
-                }
+                dom && dom.remove();
               }
-            });
+            }
           });
-          const listDom = render(data);
+          const listDom = renderList(data);
           forTasks.push([
             parentDom,
             newParentDOM.replace(baseDom, listDom.join("")),
@@ -272,9 +269,9 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
         }
         return _;
       });
-      forTasks.forEach(([baseDom, newDom]) => {
+      for (const [baseDom, newDom] of forTasks) {
         template = template.replace(baseDom, newDom);
-      });
+      }
     }
   }
 
@@ -334,17 +331,15 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
       customJobs.push([id, fn, props]);
       return source;
     });
-    customTasks.forEach(([dom, newDom]) => {
+    for (const [dom, newDom] of customTasks) {
       template = template.replace(dom, newDom);
-    });
+    }
   }
 
-  let templateStr = template;
-  const baseTemplate = template.replace(/{{(.*?)}}/g, (source, key, start) => {
+  template = template.replace(/{{(.*?)}}/g, (source, key, start) => {
     if (!state) return `[without state "${key}"]`;
     key = key.trim();
     if (ref && key in ref) {
-      refSet.add(key);
       return ref[key];
     }
     const value = getValue(state, key);
@@ -358,16 +353,13 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
     return value;
   });
 
-  templateStr = baseTemplate;
-
-  const stateArray = Array.from(stateSet);
   if (state) {
+    const stateArray = Array.from(stateSet);
     for (let i = 0; i < stateArray.length; i++) {
       let domStr = stateArray[i];
       const sourceDomStr = domStr.replace(/{{(.*?)}}/g, (source, key) => {
         key = key.trim();
         if (ref && key in ref) {
-          refSet.add(key);
           return ref[key] as unknown as string;
         }
         const value = getValue(state, key);
@@ -376,39 +368,25 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
         }
         return value;
       });
-      let baseDomStr = sourceDomStr;
+      const [baseDomStr, id] = addDomID(sourceDomStr, getRandomID);
 
-      let id = "";
-      if (baseDomStr.indexOf("id=") === -1) {
-        id = getRandomID();
-        baseDomStr = baseDomStr.replace(">", ` id="${id}">`);
-      } else {
-        id = baseDomStr.match(/id="(.*?)"/)?.[1] || getRandomID();
-      }
-
-      const update = () => {
-        return baseDomStr.replace(/{{(.*?)}}/g, (_, key) => {
-          const value = getValue(state, key);
-          if (typeof value === "function") {
-            return value();
-          }
-          return value;
-        });
-      };
+      const update = () => baseDomStr.replace(/{{(.*?)}}/g, (_, key) => {
+        const value = getValue(state, key);
+        return typeof value === "function" ? value() : value;
+      });
 
       const newDomStr = baseDomStr.replace(/{{(.*?)}}/g, (_, key) => {
         const value = getValue(state, key);
         if (typeof value === "function") {
           return value(() => {
             const dom = document.getElementById(id);
-            if (!dom) return;
-            dom.outerHTML = update();
+            if (dom) dom.outerHTML = update();
           });
         }
 
         return value;
       });
-      templateStr = templateStr.replace(sourceDomStr, newDomStr);
+      template = template.replace(sourceDomStr, newDomStr);
     }
   }
 
@@ -419,7 +397,7 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
     ? Array.prototype.indexOf.call(parent.children, element)
     : -1;
 
-  element.innerHTML = templateStr;
+  element.innerHTML = template;
 
   let ele = isTemplateNode
     ? (element as HTMLTemplateElement).content.firstElementChild

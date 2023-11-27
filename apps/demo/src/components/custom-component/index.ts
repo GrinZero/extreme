@@ -1,5 +1,4 @@
-import { render } from "@/core";
-import { GetState, useRef } from "@/hooks";
+import { GetState, useRef, render } from "extreme";
 import template from "./index.html?raw";
 
 export const CustomComponent = (
@@ -24,7 +23,7 @@ export const CustomComponent = (
   ];
   const divRef = useRef();
 
-  render(element, template, {
+  return render(element, template, {
     state: {
       defaultData,
       open: props.open,
@@ -33,6 +32,4 @@ export const CustomComponent = (
       divRef,
     },
   });
-
-  console.log(divRef());
 };

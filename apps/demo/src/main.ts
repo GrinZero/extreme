@@ -3,8 +3,7 @@ import typescriptLogo from "./typescript.svg";
 import viteLogo from "/vite.svg";
 import { Counter, List, CustomComponent } from "./components";
 
-import { extreme } from "./core";
-import { useState } from "./hooks";
+import { extreme, useState } from "extreme";
 
 extreme.use({
   Counter,

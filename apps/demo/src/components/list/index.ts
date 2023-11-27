@@ -1,5 +1,4 @@
-import { useStyles, useState, useRef } from "@/hooks";
-import { render, Updater } from "@/core";
+import { useStyles, useState, useRef, render, Updater } from "extreme";
 import styles from "./index.css?raw";
 import template from "./index.html?raw";
 
@@ -24,8 +23,6 @@ export const List = (
   } = {}
 ) => {
   useStyles(styles);
-
-  console.log("props",props)
 
   const [data, setData] = useState(props.defaultData || defaultData);
   const listRef = useRef();
