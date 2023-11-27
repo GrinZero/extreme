@@ -10,7 +10,7 @@ const decode = (src: string) => {
     .replace(/\\n/g, "\n")
     .replace(/\\t/g, "")
     .replace(/\\r/g, "")
-    .replaceAll('\\"', '"');
+    .replaceAll('\\"', '"')
 };
 
 const encode = (src: string) => {
