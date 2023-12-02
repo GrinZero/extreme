@@ -33,7 +33,7 @@ export const findDomStr = (index: number, htmlText: string) => {
   return htmlText.slice(firstDOMIndex, lastIndex);
 };
 
-export const getDomID = (domStr: string) => domStr.match(/id="(.*?)"/)?.[1]
+export const getDomID = (domStr: string) => domStr.match(/id="(.*?)"/)?.[1];
 
 export const addDomID = (domStr: string, newID: string | (() => string)) => {
   let id = "";
@@ -41,7 +41,12 @@ export const addDomID = (domStr: string, newID: string | (() => string)) => {
   const idIndex = domStr.indexOf("id=");
   if (idIndex === -1 || idIndex > firstEndIndex) {
     id = typeof newID === "function" ? newID() : newID;
-    domStr = domStr.replace(">", ` id="${id}">`);
+    const replaceStr = ` id="${id}"`;
+    if (domStr.indexOf("/>") !== -1) {
+      domStr = domStr.replace("/>", replaceStr + "/>");
+    } else {
+      domStr = domStr.replace(">", replaceStr + ">");
+    }
   } else {
     id = domStr.match(/id="(.*?)"/)?.[1] || getRandomID();
   }

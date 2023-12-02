@@ -39,7 +39,7 @@ function rawMinifyPlugin() {
         const code = decode(src);
 
         const minifyCode = htmlMinify(code, {
-          collapseBooleanAttributes: true,
+          collapseBooleanAttributes: false,
           collapseWhitespace: true,
           decodeEntities: true,
           html5: true,

@@ -34,7 +34,7 @@ export type ExtremeElement<T extends HTMLElement | HTMLTemplateElement> =
   | T
   | null
   | Element;
-export const render = <T extends HTMLElement | HTMLTemplateElement>(
+export function render<T extends HTMLElement | HTMLTemplateElement>(
   element: T,
   template: string,
   props: TemplateProps = {
@@ -43,7 +43,7 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
     methods: null,
   },
   replace: boolean = true
-): ExtremeElement<T> => {
+): ExtremeElement<T> {
   const { state, ref, methods } = props;
 
   const isTemplateNode = element.nodeName === "TEMPLATE";
@@ -72,10 +72,9 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
       return _;
     });
     usageDomSet.forEach((dom) => {
-      let id = "";
       if (dom.indexOf("id=") === -1) {
-        id = getRandomID();
-        template = template.replace(dom, dom.replace(">", ` id="${id}">`));
+        const [newDom] = addDomID(dom, getRandomID);
+        template = template.replace(dom, newDom);
       }
     });
     template = template.replace(/id="{{(.*?)}}"/g, (_, key) => {
@@ -124,9 +123,10 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
             const newOpen = value();
             if (newOpen === open) return;
             const element = document.getElementById(id);
-            if (!sibling && !parent && element) {
+            if (!sibling && !parent && element && element.nodeName === "TEMPLATE") {
               sibling = element.nextElementSibling;
               parent = element.parentElement;
+              element.remove();
             }
             if (newOpen) {
               // 还原到初始状态并插入到原本的位置
@@ -281,10 +281,10 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
     template.replace(/<([A-Z].*?)[\/\>\s]/g, (source, name, start) => {
       if (!extreme.store) return source;
       const componentName = name.trim();
+
       const dom = findDomStr(start, template);
       const fn = extreme.store[componentName];
       const props: Record<string, unknown> = {};
-
       dom.replace(
         /(\w+)\s*=\s*["']\{\{([^{}]+)\}\}["']/g,
         (_, _attrKey, _valueKey) => {
@@ -370,10 +370,11 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
       });
       const [baseDomStr, id] = addDomID(sourceDomStr, getRandomID);
 
-      const update = () => baseDomStr.replace(/{{(.*?)}}/g, (_, key) => {
-        const value = getValue(state, key);
-        return typeof value === "function" ? value() : value;
-      });
+      const update = () =>
+        baseDomStr.replace(/{{(.*?)}}/g, (_, key) => {
+          const value = getValue(state, key);
+          return typeof value === "function" ? value() : value;
+        });
 
       const newDomStr = baseDomStr.replace(/{{(.*?)}}/g, (_, key) => {
         const value = getValue(state, key);
@@ -463,4 +464,4 @@ export const render = <T extends HTMLElement | HTMLTemplateElement>(
   }
 
   return ele;
-};
+}

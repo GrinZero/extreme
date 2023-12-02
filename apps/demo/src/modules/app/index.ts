@@ -1,6 +1,6 @@
-import { render } from "extreme";
+import { createComponent } from "extreme";
 import template from "./index.html?raw";
 
-export const App = (element: HTMLElement) => {
-  return render(element, template);
-};
+export const App = createComponent("App", () => {
+  return { template };
+});
