@@ -7,13 +7,13 @@ import {
   getHash,
 } from "./dom-str";
 import { extreme } from "./extreme";
+import { setCurrentListener } from "./listener";
 
 export interface TemplateProps {
   state?: Record<string, any> | null;
   ref?: Record<string, Ref> | null;
   methods?: Record<string, Function> | null;
 }
-export type Updater = (newData?: unknown, oldData?: unknown) => void;
 
 const getValue = (state: Record<string, any>, key: string) => {
   const _key = key.trim();
@@ -119,11 +119,16 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
           let parent: null | Element = null;
           let open: boolean;
 
-          const data = value(() => {
+          const rerenderIf = () => {
             const newOpen = value();
             if (newOpen === open) return;
             const element = document.getElementById(id);
-            if (!sibling && !parent && element && element.nodeName === "TEMPLATE") {
+            if (
+              !sibling &&
+              !parent &&
+              element &&
+              element.nodeName === "TEMPLATE"
+            ) {
               sibling = element.nextElementSibling;
               parent = element.parentElement;
               element.remove();
@@ -146,7 +151,10 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
               element.remove();
             }
             open = newOpen;
-          });
+          };
+          setCurrentListener(rerenderIf);
+          const data = value();
+          setCurrentListener(null);
           open = data;
           addTask(data);
           return _;
@@ -195,7 +203,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
         };
 
         if (typeof list === "function") {
-          const data = list((newList: any[], oldList: any[]) => {
+          const rerenderList = (newList: any[], oldList: any[]) => {
             const parent = document.getElementById(parentID);
             if (!parent) return;
 
@@ -260,7 +268,10 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
                 dom && dom.remove();
               }
             }
-          });
+          };
+          setCurrentListener(rerenderList);
+          const data = list(rerenderList);
+          setCurrentListener(null);
           const listDom = renderList(data);
           forTasks.push([
             parentDom,
@@ -370,19 +381,21 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
       });
       const [baseDomStr, id] = addDomID(sourceDomStr, getRandomID);
 
-      const update = () =>
-        baseDomStr.replace(/{{(.*?)}}/g, (_, key) => {
-          const value = getValue(state, key);
-          return typeof value === "function" ? value() : value;
-        });
-
       const newDomStr = baseDomStr.replace(/{{(.*?)}}/g, (_, key) => {
         const value = getValue(state, key);
         if (typeof value === "function") {
-          return value(() => {
+          const rerenderDom = () => {
             const dom = document.getElementById(id);
-            if (dom) dom.outerHTML = update();
-          });
+            if (dom)
+              dom.outerHTML = baseDomStr.replace(/{{(.*?)}}/g, (_, key) => {
+                const value = getValue(state, key);
+                return typeof value === "function" ? value() : value;
+              });
+          };
+          setCurrentListener(rerenderDom);
+          const newValue = value();
+          setCurrentListener(null);
+          return newValue;
         }
 
         return value;

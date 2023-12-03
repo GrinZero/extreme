@@ -1,5 +1,6 @@
 export type GetState<T = unknown> = (fn?: (v?: T, old?: T) => void) => T;
 export type SetState<T = unknown> = (v: T) => void;
+import { getCurrentListener } from "../core/listener";
 
 export const idleCallback =
   globalThis.requestIdleCallback || ((fn) => setTimeout(fn, 0));
@@ -8,6 +9,8 @@ export const useState = <T = unknown>(value: T) => {
   let _value = value;
   const set = new Set<(v?: T, old?: T) => void>();
   const getValue: GetState<T> = (fn) => {
+    const listener = getCurrentListener();
+    if (listener) set.add(listener);
     if (fn) set.add(fn);
     return _value;
   };

@@ -1,4 +1,4 @@
-import { useStyles, useState, useRef, render, Updater } from "extreme";
+import { useStyles, useState, useRef, render } from "extreme";
 import styles from "./index.css?raw";
 import template from "./index.html?raw";
 
@@ -89,7 +89,7 @@ export const List = (
   const list = render(element, template, {
     state: {
       items: data,
-      showReset: (fn: Updater) => data(fn).length > 0,
+      showReset: () => data().length > 0,
     },
     methods: {
       handleClear,

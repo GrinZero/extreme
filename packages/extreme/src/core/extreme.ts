@@ -1,4 +1,5 @@
 import { render, TemplateProps } from "./render";
+import { currentCell, resetCurrentCell } from "./cell";
 
 export interface Extreme {
   store: Record<string, Function>;
@@ -10,22 +11,6 @@ export const extreme: Extreme = {
   use: (store: Record<string, Function>) => {
     extreme.store = store;
   },
-};
-
-type Fiber = {
-  mount?: Function | null;
-};
-let currentFiber: Fiber = {
-  mount: null,
-};
-const resetCurrentFiber = () => {
-  currentFiber = {
-    mount: null,
-  };
-};
-
-export const useMount = (fn: Function) => {
-  currentFiber.mount = fn;
 };
 
 export type ExtremeRenderFn = (
@@ -47,8 +32,8 @@ export const createComponent = (name: string, component: ExtremeRenderFn) => {
   ) => {
     const result = component(props);
     render(element, result.template, result, replace);
-    currentFiber.mount?.();
-    resetCurrentFiber();
+    currentCell.mount?.();
+    resetCurrentCell();
   };
   fn.displayName = name;
   if (extreme.store[name]) {
