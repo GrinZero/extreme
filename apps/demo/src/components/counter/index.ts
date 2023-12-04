@@ -6,7 +6,7 @@ export const Counter = (element: HTMLElement) => {
   useStyles(styles);
   const resetRef = useRef();
   const [count, setCount] = useState(0);
-  const [title, setTitle] = useState("the form is not submit");
+  const [title, setTitle] = useState(`<img src="123"/>`);
 
   const decrement = () => {
     setCount(count() - 1);

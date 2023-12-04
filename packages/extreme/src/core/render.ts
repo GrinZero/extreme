@@ -29,6 +29,10 @@ const getValue = (state: Record<string, any>, key: string) => {
     return state[_key];
   }
 };
+const encodeValue = (value: any) => {
+  const str = String(value);
+  return str.replace(/[\u00A0-\u9999<>\&]/gim, (i) => `&#${i.charCodeAt(0)};`);
+};
 
 export type ExtremeElement<T extends HTMLElement | HTMLTemplateElement> =
   | T
@@ -106,7 +110,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
         const value = getValue(state, key);
         const id = getDomID(baseDom)!;
 
-        const addTask = (value: boolean) => {
+        const addTask = (value?: boolean | null) => {
           const task = [
             baseDom,
             value ? dom : `<template id="${id}"></template>`,
@@ -117,8 +121,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
         if (typeof value === "function") {
           let sibling: null | Element = null;
           let parent: null | Element = null;
-          let open: boolean;
-
+          let open: boolean | null | undefined = null;
           const rerenderIf = () => {
             const newOpen = value();
             if (newOpen === open) return;
@@ -164,6 +167,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
         return _;
       });
       for (const [baseDom, newDom] of ifTasks) {
+        console.log("baseDom", baseDom,newDom);
         template = template.replace(baseDom, newDom);
       }
 
@@ -195,7 +199,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
             });
             newDom = newDom.replace(/{{(.*?)}}/g, (_, key) => {
               const value = getValue(item, key.replace(`${itemName}.`, ""));
-              return typeof value === "function" ? value() : value;
+              return encodeValue(typeof value === "function" ? value() : value);
             });
             return newDom;
           });
@@ -351,7 +355,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
     if (!state) return `[without state "${key}"]`;
     key = key.trim();
     if (ref && key in ref) {
-      return ref[key];
+      return ref[key] as unknown as string;
     }
     const value = getValue(state, key);
 
@@ -360,8 +364,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
       stateSet.add(dom);
       return source;
     }
-
-    return value;
+    return encodeValue(value);
   });
 
   if (state) {
@@ -377,7 +380,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
         if (typeof value === "function") {
           return source;
         }
-        return value;
+        return encodeValue(value);
       });
       const [baseDomStr, id] = addDomID(sourceDomStr, getRandomID);
 
@@ -389,16 +392,18 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
             if (dom)
               dom.outerHTML = baseDomStr.replace(/{{(.*?)}}/g, (_, key) => {
                 const value = getValue(state, key);
-                return typeof value === "function" ? value() : value;
+                return encodeValue(
+                  typeof value === "function" ? value() : value
+                );
               });
           };
           setCurrentListener(rerenderDom);
-          const newValue = value();
+          const newValue = encodeValue(value());
           setCurrentListener(null);
           return newValue;
         }
 
-        return value;
+        return encodeValue(value);
       });
       template = template.replace(sourceDomStr, newDomStr);
     }
