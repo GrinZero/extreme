@@ -5,6 +5,7 @@ import {
   addDomID,
   getRandomID,
   getHash,
+  analyzeKey,
 } from "./dom-str";
 import { extreme } from "./extreme";
 import { setCurrentListener } from "./listener";
@@ -167,7 +168,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
         return _;
       });
       for (const [baseDom, newDom] of ifTasks) {
-        console.log("baseDom", baseDom,newDom);
+        console.log("baseDom", baseDom, newDom);
         template = template.replace(baseDom, newDom);
       }
 
@@ -383,28 +384,48 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
         return encodeValue(value);
       });
       const [baseDomStr, id] = addDomID(sourceDomStr, getRandomID);
+      const newDomStr = baseDomStr.replace(
+        /{{(.*?)}}/g,
+        (source, key, start) => {
+          const value = getValue(state, key);
+          if (typeof value === "function") {
+            const analyzeUpdateKey = analyzeKey(baseDomStr, source, start);
+            if (analyzeUpdateKey === null) {
+              console.error(`[extreme] ${source} is not a valid UpdateKey`);
+              return source;
+            }
+            const rerenderDom = () => {
+              const dom = document.getElementById(id);
+              if (!dom) return;
+              const newValue = encodeValue(value());
+              if (analyzeUpdateKey.type === "textContent") {
+                dom.textContent = newValue;
+                return;
+              }
+              if (analyzeUpdateKey.type === "attr") {
+                dom.setAttribute(analyzeUpdateKey.key, newValue);
+                return;
+              }
+              if (analyzeUpdateKey.type === "textNode") {
+                dom.childNodes[analyzeUpdateKey.key].textContent =
+                  analyzeUpdateKey.content.replace(/{{(.*?)}}/g, (_, key) => {
+                    const value = getValue(state, key);
+                    return encodeValue(
+                      typeof value === "function" ? value() : value
+                    );
+                  });
+                return;
+              }
+            };
+            setCurrentListener(rerenderDom);
+            const newValue = encodeValue(value());
+            setCurrentListener(null);
+            return newValue;
+          }
 
-      const newDomStr = baseDomStr.replace(/{{(.*?)}}/g, (_, key) => {
-        const value = getValue(state, key);
-        if (typeof value === "function") {
-          const rerenderDom = () => {
-            const dom = document.getElementById(id);
-            if (dom)
-              dom.outerHTML = baseDomStr.replace(/{{(.*?)}}/g, (_, key) => {
-                const value = getValue(state, key);
-                return encodeValue(
-                  typeof value === "function" ? value() : value
-                );
-              });
-          };
-          setCurrentListener(rerenderDom);
-          const newValue = encodeValue(value());
-          setCurrentListener(null);
-          return newValue;
+          return encodeValue(value);
         }
-
-        return encodeValue(value);
-      });
+      );
       template = template.replace(sourceDomStr, newDomStr);
     }
   }

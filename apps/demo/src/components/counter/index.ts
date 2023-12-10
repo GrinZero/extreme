@@ -21,7 +21,7 @@ export const Counter = (element: HTMLElement) => {
   const base = render(element, template, {
     state: {
       count,
-      title,
+      title
     },
     ref: {
       resetRef,
