@@ -1,12 +1,26 @@
-import { render, useStyles, useRef, useState, useEffect } from "extreme";
+import {
+  useStyles,
+  useRef,
+  useState,
+  useEffect,
+  createComponent,
+  useMount,
+} from "extreme";
 import styles from "./index.css?raw";
 import template from "./index.html?raw";
 
-export const Counter = (element: HTMLElement) => {
-  useStyles(styles);
+export const Counter = createComponent("Counter", () => {
   const resetRef = useRef();
   const [count, setCount] = useState(0);
   const [title, setTitle] = useState(`<img src="123"/>`);
+  useStyles(styles);
+
+  useMount(() => {
+    resetRef()?.addEventListener("click", () => {
+      setCount(0);
+      setTitle("the form is not submit");
+    });
+  });
 
   const decrement = () => {
     setCount(count() - 1);
@@ -18,10 +32,19 @@ export const Counter = (element: HTMLElement) => {
     setTitle("submit success");
   };
 
-  const base = render(element, template, {
+  count((newV) => {
+    console.log("newV", newV);
+  });
+
+  useEffect(() => {
+    console.log("count&title", count(), title());
+  }, [count, title]);
+
+  return {
+    template,
     state: {
       count,
-      title
+      title,
     },
     ref: {
       resetRef,
@@ -31,20 +54,5 @@ export const Counter = (element: HTMLElement) => {
       increment,
       handleSubmit: submit,
     },
-  });
-
-  count((newV) => {
-    console.log("newV", newV);
-  });
-
-  useEffect(() => {
-    console.log("count&title", count(), title());
-  }, [count, title]);
-
-  resetRef()?.addEventListener("click", () => {
-    setCount(0);
-    setTitle("the form is not submit");
-  });
-
-  return base;
-};
+  };
+});

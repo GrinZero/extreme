@@ -72,8 +72,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
   {
     const usageDomSet = new Set<string>();
     template.replace(/{{(.*?)}}/g, (_, _key, start) => {
-      const dom = findDomStr(start, template);
-      usageDomSet.add(dom);
+      usageDomSet.add(findDomStr(start, template));
       return _;
     });
     usageDomSet.forEach((dom) => {
@@ -94,8 +93,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
   {
     template = template.replace(/@(.*?)}}"/g, (_, key, start) => {
       const [methodName, funcName] = key.split(`=\"{{`);
-      const dom = findDomStr(start, template);
-      addMethodTask(methodName, funcName, dom);
+      addMethodTask(methodName, funcName, findDomStr(start, template));
       return "";
     });
   }
@@ -112,11 +110,10 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
         const id = getDomID(baseDom)!;
 
         const addTask = (value?: boolean | null) => {
-          const task = [
+          ifTasks.push([
             baseDom,
             value ? dom : `<template id="${id}"></template>`,
-          ] as [string, string];
-          ifTasks.push(task);
+          ] as [string, string]);
         };
 
         if (typeof value === "function") {
@@ -168,7 +165,6 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
         return _;
       });
       for (const [baseDom, newDom] of ifTasks) {
-        console.log("baseDom", baseDom, newDom);
         template = template.replace(baseDom, newDom);
       }
 
@@ -361,8 +357,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
     const value = getValue(state, key);
 
     if (typeof value === "function") {
-      const dom = findDomStr(start, template);
-      stateSet.add(dom);
+      stateSet.add(findDomStr(start, template));
       return source;
     }
     return encodeValue(value);
@@ -378,10 +373,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
           return ref[key] as unknown as string;
         }
         const value = getValue(state, key);
-        if (typeof value === "function") {
-          return source;
-        }
-        return encodeValue(value);
+        return typeof value === "function" ? source : encodeValue(value);
       });
       const [baseDomStr, id] = addDomID(sourceDomStr, getRandomID);
       const newDomStr = baseDomStr.replace(
@@ -398,23 +390,22 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
               const dom = document.getElementById(id);
               if (!dom) return;
               const newValue = encodeValue(value());
-              if (analyzeUpdateKey.type === "textContent") {
-                dom.textContent = newValue;
-                return;
-              }
-              if (analyzeUpdateKey.type === "attr") {
-                dom.setAttribute(analyzeUpdateKey.key, newValue);
-                return;
-              }
-              if (analyzeUpdateKey.type === "textNode") {
-                dom.childNodes[analyzeUpdateKey.key].textContent =
-                  analyzeUpdateKey.content.replace(/{{(.*?)}}/g, (_, key) => {
-                    const value = getValue(state, key);
-                    return encodeValue(
-                      typeof value === "function" ? value() : value
-                    );
-                  });
-                return;
+              switch (analyzeUpdateKey.type) {
+                case "textContent":
+                  dom.textContent = newValue;
+                  break;
+                case "attr":
+                  dom.setAttribute(analyzeUpdateKey.key, newValue);
+                  break;
+                case "textNode":
+                  dom.childNodes[analyzeUpdateKey.key].textContent =
+                    analyzeUpdateKey.content.replace(/{{(.*?)}}/g, (_, key) => {
+                      const value = getValue(state, key);
+                      return encodeValue(
+                        typeof value === "function" ? value() : value
+                      );
+                    });
+                  break;
               }
             };
             setCurrentListener(rerenderDom);
@@ -422,7 +413,6 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
             setCurrentListener(null);
             return newValue;
           }
-
           return encodeValue(value);
         }
       );

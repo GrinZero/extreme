@@ -31,9 +31,10 @@ export const createComponent = (name: string, component: ExtremeRenderFn) => {
     replace: boolean = true
   ) => {
     const result = component(props);
-    render(element, result.template, result, replace);
+    const ele = render(element, result.template, result, replace);
     currentCell.mount?.();
     resetCurrentCell();
+    return ele;
   };
   fn.displayName = name;
   if (extreme.store[name]) {

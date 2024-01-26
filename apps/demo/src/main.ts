@@ -1,16 +1,7 @@
 import "./style.css";
-import { Counter, List, CustomComponent } from "./components";
-import { App, Topbar, Content, Demo } from "./modules";
-
-import { extreme } from "extreme";
-
-extreme.use({
-  Counter,
-  List,
-  CustomComponent,
-  Topbar,
-  Content,
-});
+import { App, Demo } from "./modules";
+export * from "./components"
+export * from "./modules"
 
 const handleHashChange = () => {
   if (window.location.hash.match(/#\/demo/)) {
