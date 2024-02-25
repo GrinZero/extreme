@@ -1,0 +1,31 @@
+{
+  "name": "@sourcebug/vite-extreme-plugin",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/vite-extreme-plugin.mjs",
+      "require": "./dist/vite-extreme-plugin.umd.js"
+    }
+  },
+  "types": "./types/src/index.d.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "vite build",
+    "dev": "vite build --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/csso": "^5.0.3",
+    "@types/html-minifier": "^4.0.5",
+    "html-minifier": "^4.0.0",
+    "vite": "^4.4.5",
+    "vite-plugin-dts": "^3.6.3"
+  },
+  "dependencies": {
+    "csso": "^5.0.5"
+  }
+}
