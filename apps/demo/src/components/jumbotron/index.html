@@ -5,7 +5,7 @@
     </div>
     <div class="col-md-6">
       <div class="row">
-        <MyButton title="{{run.title}}" cb="{{run.fn}}" />
+        <MyButton :for="item in items" title="{{item.title}}"></MyButton>
         <!-- <MyButton id="runlots" title="Create 10,000 rows" cb="{{runLots}}" />
         <MyButton id="add" title="Append 1,000 rows" cb="{{add}}" />
         <MyButton id="update" title="Update every 10th row" cb="{{update}}" />

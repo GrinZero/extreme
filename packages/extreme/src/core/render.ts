@@ -178,12 +178,10 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
 
         const baseDom = findDomStr(start, template);
         const dom = baseDom.replace(_, "");
-
         const parentDom = findDomStr(template.indexOf(baseDom) - 1, template);
         const [newParentDOM, parentID] = addDomID(parentDom, getRandomID);
 
         const list = getValue(state, listName);
-
         const renderList = (data: any[]) => {
           const domList = data.map((item: any, index: number) => {
             const listID = getHash(String(item.key ?? index));
@@ -278,9 +276,18 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
             parentDom,
             newParentDOM.replace(baseDom, listDom.join("")),
           ]);
+          return _;
         }
+
+        const listDom = renderList(list);
+        forTasks.push([
+          parentDom,
+          newParentDOM.replace(baseDom, listDom.join("")),
+        ]);
+
         return _;
       });
+
       for (const [baseDom, newDom] of forTasks) {
         template = template.replace(baseDom, newDom);
       }

@@ -53,7 +53,7 @@ export const addDomID = (domStr: string, newID: string | (() => string)) => {
   return [domStr, id];
 };
 
-export const getHash = (str: string) => "W" + btoa(str);
+export const getHash = (str: string) => "W" + btoa(str).replace(/=/g, "ace");
 
 const analyzeDomCache = new Map<string, HTMLDivElement>();
 
