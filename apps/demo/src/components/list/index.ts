@@ -1,4 +1,4 @@
-import { useStyles, useState, useRef, createComponent } from "extreme";
+import { useStyles, useState, useRef, createComponent } from "@sourcebug/extreme/dev";
 import styles from "./index.css?raw";
 import template from "./index.html?raw";
 

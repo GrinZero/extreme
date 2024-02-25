@@ -13,21 +13,24 @@ export const extreme: Extreme = {
   },
 };
 
-export type ExtremeRenderFn = (
-  props?: Record<any, unknown>
+export type ExtremeRenderFn<Props extends Record<any, unknown>> = (
+  props: Props
 ) => TemplateProps & {
   template: string;
 };
 
-export type ExtremeComponent = {
-  (element: HTMLElement, props?: Record<any, unknown>, replace?: boolean): void;
+export type ExtremeComponent<Props extends Record<any, unknown>> = {
+  (element: HTMLElement, props: Props, replace?: boolean): void;
   displayName: string;
 };
 
-export const createComponent = (name: string, component: ExtremeRenderFn) => {
-  const fn: ExtremeComponent = (
+export const createComponent = <Props extends Record<any, unknown>>(
+  name: string,
+  component: ExtremeRenderFn<Props>
+) => {
+  const fn: ExtremeComponent<Props> = (
     element: HTMLElement,
-    props?: Record<any, unknown>,
+    props: Props,
     replace: boolean = true
   ) => {
     const result = component(props);

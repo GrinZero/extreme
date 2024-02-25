@@ -1,4 +1,4 @@
-import { useMount, createComponent, useRef, useState } from "extreme";
+import { useMount, createComponent, useRef, useState } from "@sourcebug/extreme/dev";
 import template from "./index.html?raw";
 import "./index.less";
 import typescriptLogo from "./typescript.svg";

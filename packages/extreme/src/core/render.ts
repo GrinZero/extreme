@@ -296,32 +296,38 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
 
       const dom = findDomStr(start, template);
       const fn = extreme.store[componentName];
-      const props: Record<string, unknown> = {};
-      dom.replace(
-        /(\w+)\s*=\s*["']\{\{([^{}]+)\}\}["']/g,
-        (_, _attrKey, _valueKey) => {
-          const attrName = _attrKey.trim();
-          const valueKey = _valueKey.trim();
+      const propsCurrent: Record<string, unknown> = {};
+      dom.replace(/\s(.*?)="(.*?)"/g, (_, _attrKey, _valueKey) => {
+        // TODO: 这里应该拿走每一个属性
+        const attrName = _attrKey.trim();
+        const valueKey = _valueKey.trim();
 
-          if (attrName === "id" && ref && valueKey in ref) {
-            props[attrName] = ref[valueKey];
+
+        if (/{{(.*?)}}/.test(valueKey)) {
+          const newValueKey = valueKey.split("{{")[1].split("}}")[0];
+
+          if (attrName === "id" && ref) {
+            propsCurrent[attrName] = getValue(ref, newValueKey);
             return _;
           }
 
           if (attrName.startsWith(":")) {
-            props[attrName] = `{{${valueKey}}}`;
+            propsCurrent[attrName] = `{{${newValueKey}}}`;
             return _;
           }
 
-          if (state && valueKey in state && !attrName.startsWith("@")) {
-            props[attrName] = state[valueKey];
+          if (state && !attrName.startsWith("@")) {
+
+            propsCurrent[attrName] = getValue(state, newValueKey);
             return _;
           }
-          return _;
         }
-      );
 
-      const id = (props.id as string) || getDomID(dom) || getRandomID();
+        propsCurrent[attrName] = valueKey;
+        return _;
+      });
+
+      const id = (propsCurrent.id as string) || getDomID(dom) || getRandomID();
       let newDom = `<div id="${id}"`;
       if (":if" in props) {
         newDom += ` :if="${props[":if"]}"`;
@@ -333,14 +339,15 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
       }
       Object.keys(props).forEach((key) => {
         if (key.startsWith("@")) {
-          newDom += ` ${key}="${props[key]}"`;
-          delete props[key];
+          newDom += ` ${key}="${propsCurrent[key]}"`;
+          delete propsCurrent[key];
         }
       });
 
       newDom += `></div>`;
       customTasks.push([dom, newDom]);
-      customJobs.push([id, fn, props]);
+      // debugger
+      customJobs.push([id, fn, propsCurrent]);
       return source;
     });
     for (const [dom, newDom] of customTasks) {
@@ -439,7 +446,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
   // 第四阶段，处理所有自定义组件
 
   if (backElement) {
-    customJobs.forEach(([id, fn, props]) => {
+    customJobs.forEach(([id, fn, propsCurrent]) => {
       const isRoot =
         backElement.nodeName === "TEMPLATE" || backElement.id === id;
       const newEle = isRoot
@@ -449,7 +456,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
       const isFirst = backElement.firstElementChild === newEle;
 
       if (newEle) {
-        const newElement: HTMLElement = fn(newEle, props);
+        const newElement: HTMLElement = fn(newEle, propsCurrent);
         newElement.id = newElement.id || id;
         if (isRoot || isFirst) {
           ele = newElement;

@@ -17,11 +17,11 @@
     "tsconfig": "workspace:*",
     "typescript": "^5.0.2",
     "vite": "^4.4.5",
-    "vite-raw-minify-plugin": "workspace:*",
+    "@sourcebug/vite-extreme-plugin": "workspace:*",
     "vitest": "^0.34.6"
   },
   "dependencies": {
-    "extreme": "workspace:*",
+    "@sourcebug/extreme": "workspace:*",
     "less": "^4.2.0"
   }
 }

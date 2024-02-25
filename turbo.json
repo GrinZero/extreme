@@ -11,8 +11,8 @@
       "cache": false,
       "persistent": true
     },
-    "demo#dev": { "dependsOn": ["vite-raw-minify-plugin#build"] },
+    "demo#dev": { "dependsOn": ["@sourcebug/vite-extreme-plugin#build"] },
     "test": {},
-    "demo#build": { "dependsOn": ["vite-raw-minify-plugin#build"] }
+    "demo#build": { "dependsOn": ["@sourcebug/vite-extreme-plugin#build"] }
   }
 }

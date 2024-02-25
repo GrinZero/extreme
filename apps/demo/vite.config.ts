@@ -1,6 +1,6 @@
 /// <reference types="vitest" />
 import { defineConfig } from "vite";
-import { rawMinifyPlugin } from "vite-raw-minify-plugin";
+import { rawMinifyPlugin } from "@sourcebug/vite-extreme-plugin";
 import { resolve } from "path";
 
 export default defineConfig(({ mode }) => ({
@@ -9,6 +9,8 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": resolve(__dirname, "src"),
+      "@sourcebug/extreme/dev":
+        mode === "production" ? "@sourcebug/extreme" : "@sourcebug/extreme/dev",
     },
   },
   test: {

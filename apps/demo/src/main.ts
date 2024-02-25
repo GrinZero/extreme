@@ -1,7 +1,6 @@
 import "./style.css";
 import { App, Demo } from "./modules";
 export * from "./components"
-export * from "./modules"
 
 const handleHashChange = () => {
   if (window.location.hash.match(/#\/demo/)) {

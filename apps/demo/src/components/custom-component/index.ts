@@ -1,4 +1,4 @@
-import { GetState, useRef, createComponent } from "extreme";
+import { GetState, useRef, createComponent } from "@sourcebug/extreme/dev";
 import template from "./index.html?raw";
 
 export const CustomComponent = createComponent(

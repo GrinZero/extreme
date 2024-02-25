@@ -5,7 +5,7 @@ import {
   useEffect,
   createComponent,
   useMount,
-} from "extreme";
+} from "@sourcebug/extreme/dev";
 import styles from "./index.css?raw";
 import template from "./index.html?raw";
 
