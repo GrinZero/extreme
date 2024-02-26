@@ -14,12 +14,14 @@ export const useState = <T = unknown>(value: T) => {
     if (fn) set.add(fn);
     return _value;
   };
-  const setValue: SetState<T> = (value: T) => {
+  const setValue: SetState<T> = async (value: T) => {
     if (_value === value) return;
     const oldV = _value;
     _value = value;
     for (const fn of set) {
-      idleCallback(() => fn(_value, oldV));
+      await new Promise((resolve) => {
+        idleCallback(() => resolve(fn(_value, oldV)));
+      });
     }
   };
   return [getValue, setValue] as const;

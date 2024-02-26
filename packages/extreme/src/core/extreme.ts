@@ -28,7 +28,7 @@ export const createComponent = <Props extends Record<any, unknown>>(
   name: string,
   component: ExtremeRenderFn<Props>
 ) => {
-  const fn: ExtremeComponent<Props> = (
+  const fn: ExtremeComponent<Props> = async (
     element: HTMLElement,
     props: Props,
     replace: boolean = true,
@@ -38,8 +38,19 @@ export const createComponent = <Props extends Record<any, unknown>>(
     const pushElement = isTemplate
       ? document.createElement("template")
       : element;
-    
-    const ele = render(pushElement, result.template, result, replace, isTemplate);
+
+    const ele = await render(
+      pushElement,
+      result.template,
+      result,
+      replace,
+      isTemplate
+    ).then((e) => {
+      if (e) {
+        e.id = element.id || e.id;
+      }
+      return e;
+    });
     currentCell.mount?.();
     resetCurrentCell();
     return ele;

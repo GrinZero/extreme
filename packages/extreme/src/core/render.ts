@@ -1,4 +1,4 @@
-import type { Ref } from "../hooks";
+import { idleCallback, type Ref } from "../hooks";
 import {
   findDomStr,
   getDomID,
@@ -39,7 +39,7 @@ export type ExtremeElement<T extends HTMLElement | HTMLTemplateElement> =
   | T
   | null
   | Element;
-export function render<T extends HTMLElement | HTMLTemplateElement>(
+export async function render<T extends HTMLElement | HTMLTemplateElement>(
   element: T,
   template: string,
   props: TemplateProps = {
@@ -49,7 +49,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
   },
   replace: boolean = true,
   isTemplate?: boolean
-): ExtremeElement<T> {
+): Promise<ExtremeElement<T>> {
   const { state, ref, methods } = props;
 
   const isTemplateNode = element.nodeName === "TEMPLATE" || isTemplate;
@@ -104,7 +104,13 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
     if (state) {
       // :if
       const ifTasks: [string, string][] = [];
-      template = template.replace(/:if="{{(.*?)}}"/g, (_, key, start) => {
+      const testIfResult: [string, string, number][] = [];
+      template = template.replace(/:if="(.*?)"/g, (_, key, start) => {
+        testIfResult.push([_, key, start]);
+        return _;
+      });
+
+      for (const [_, key, start] of testIfResult) {
         const baseDom = findDomStr(start, template);
         const dom = baseDom.replace(_, "");
         const value = getValue(state, key);
@@ -121,7 +127,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
           let sibling: null | Element = null;
           let parent: null | Element = null;
           let open: boolean | null | undefined = null;
-          const rerenderIf = () => {
+          const rerenderIf = async () => {
             const newOpen = value();
             if (newOpen === open) return;
             const element = document.getElementById(id);
@@ -138,7 +144,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
             if (newOpen) {
               // 还原到初始状态并插入到原本的位置
               const tmp = document.createElement("template");
-              const d = render(tmp, dom, props);
+              const d = await render(tmp, dom, props);
               const content = d as Element;
 
               if (sibling && parent) {
@@ -159,19 +165,24 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
           setCurrentListener(null);
           open = data;
           addTask(data);
-          return _;
         }
 
         addTask(value);
-        return _;
-      });
+      }
+
       for (const [baseDom, newDom] of ifTasks) {
         template = template.replace(baseDom, newDom);
       }
 
       // :for
       const forTasks: [string, string][] = [];
+
+      const testForResult: [string, string, number][] = [];
       template = template.replace(/:for="(.*?)"/g, (_, key, start) => {
+        testForResult.push([_, key, start]);
+        return _;
+      });
+      for (const [_, key, start] of testForResult) {
         const [itemName, listName] = key
           .trim()
           .split(" in ")
@@ -183,7 +194,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
         const [newParentDOM, parentID] = addDomID(parentDom, getRandomID);
 
         const list = getValue(state, listName);
-        const renderList = (data: any[]) => {
+        const renderList = async (data: any[]) => {
           const domList = data.map((item: any, index: number) => {
             const listID = getHash(String(item.key ?? index));
             let [newDom] = addDomID(dom, listID);
@@ -205,23 +216,39 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
             });
             return newDom;
           });
-          return domList.map((domStr, i) => {
-            const template = document.createElement("template");
-            if (props.state && typeof props.state === "object") {
-              props.state = { ...props.state, ...{ [itemName]: data[i] } };
-            }
-            const d = render(template, domStr, props, false, true);
-            return d?.outerHTML || '';
-          });
+          return await Promise.all(
+            domList.map((domStr, i) => {
+              const template = document.createElement("template");
+              const cloneProps = { ...props };
+              if (cloneProps.state && typeof cloneProps.state === "object") {
+                cloneProps.state = {
+                  ...cloneProps.state,
+                  ...{ [itemName]: data[i] },
+                };
+              }
+              return new Promise<string>((resolve) => {
+                idleCallback(async () => {
+                  const d = await render(
+                    template,
+                    domStr,
+                    cloneProps,
+                    false,
+                    true
+                  );
+                  resolve(d?.outerHTML || "");
+                });
+              });
+            })
+          );
         };
 
         if (typeof list === "function") {
-          const rerenderList = (newList: any[], oldList: any[]) => {
+          const rerenderList = async (newList: any[], oldList: any[]) => {
             const parent = document.getElementById(parentID);
             if (!parent) return;
 
-            const oldListRender = renderList(oldList);
-            const newListRender = renderList(newList);
+            const oldListRender = await renderList(oldList);
+            const newListRender = await renderList(newList);
             const oldIDList = oldListRender.map((item) => getDomID(item));
             const newIDList = newListRender.map((item) => getDomID(item));
             // 处理新增、移动、修改、删除的情况，确保顺序和位置正确，且最小化dom操作
@@ -285,23 +312,21 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
           setCurrentListener(rerenderList);
           const data = list(rerenderList);
           setCurrentListener(null);
-          const listDom = renderList(data);
+          const listDom = await renderList(data);
           forTasks.push([
             parentDom,
             newParentDOM.replace(baseDom, listDom.join("")),
           ]);
-          return _;
         }
 
-        const listDom = renderList(list);
+        const listDom = await renderList(
+          typeof list === "function" ? list() : list
+        );
         forTasks.push([
           parentDom,
           newParentDOM.replace(baseDom, listDom.join("")),
         ]);
-
-        return _;
-      });
-
+      }
       for (const [baseDom, newDom] of forTasks) {
         template = template.replace(baseDom, newDom);
       }
@@ -464,7 +489,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
   // 第四阶段，处理所有自定义组件
 
   if (backElement) {
-    customJobs.forEach(([id, fn, propsCurrent]) => {
+    for (const [id, fn, propsCurrent] of customJobs) {
       const isRoot =
         backElement.nodeName === "TEMPLATE" || backElement.id === id;
       const newEle = isRoot
@@ -474,7 +499,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
       const isFirst = backElement.firstElementChild === newEle;
 
       if (newEle) {
-        const newElement: HTMLElement = fn(
+        const newElement: HTMLElement = await fn(
           newEle,
           propsCurrent,
           false,
@@ -485,7 +510,7 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
           ele = newElement;
         }
       }
-    });
+    }
   }
 
   // 遍历methodsMap，通过事件委托在父节点上绑定事件
