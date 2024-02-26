@@ -31,10 +31,15 @@ export const createComponent = <Props extends Record<any, unknown>>(
   const fn: ExtremeComponent<Props> = (
     element: HTMLElement,
     props: Props,
-    replace: boolean = true
+    replace: boolean = true,
+    isTemplate?: boolean
   ) => {
     const result = component(props);
-    const ele = render(element, result.template, result, replace);
+    const pushElement = isTemplate
+      ? document.createElement("template")
+      : element;
+    
+    const ele = render(pushElement, result.template, result, replace, isTemplate);
     currentCell.mount?.();
     resetCurrentCell();
     return ele;

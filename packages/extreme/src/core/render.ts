@@ -47,11 +47,12 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
     ref: null,
     methods: null,
   },
-  replace: boolean = true
+  replace: boolean = true,
+  isTemplate?: boolean
 ): ExtremeElement<T> {
   const { state, ref, methods } = props;
 
-  const isTemplateNode = element.nodeName === "TEMPLATE";
+  const isTemplateNode = element.nodeName === "TEMPLATE" || isTemplate;
   const stateSet = new Set<string>();
   const customJobs: [string, Function, Record<string, unknown>][] = [];
   const methodsMap = new Map<string, [string, Function][]>();
@@ -193,12 +194,25 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
               return `id="${listID}Y${key}"`;
             });
             newDom = newDom.replace(/{{(.*?)}}/g, (_, key) => {
+              if (key === itemName) {
+                return _;
+              }
               const value = getValue(item, key.replace(`${itemName}.`, ""));
+              if (value === undefined) {
+                return _;
+              }
               return encodeValue(typeof value === "function" ? value() : value);
             });
             return newDom;
           });
-          return domList;
+          return domList.map((domStr, i) => {
+            const template = document.createElement("template");
+            if (props.state && typeof props.state === "object") {
+              props.state = { ...props.state, ...{ [itemName]: data[i] } };
+            }
+            const d = render(template, domStr, props, false, true);
+            return d?.outerHTML || '';
+          });
         };
 
         if (typeof list === "function") {
@@ -305,10 +319,8 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
       const fn = extreme.store[componentName];
       const propsCurrent: Record<string, unknown> = {};
       dom.replace(/\s(.*?)="(.*?)"/g, (_, _attrKey, _valueKey) => {
-        // TODO: 这里应该拿走每一个属性
         const attrName = _attrKey.trim();
         const valueKey = _valueKey.trim();
-
 
         if (/{{(.*?)}}/.test(valueKey)) {
           const newValueKey = valueKey.split("{{")[1].split("}}")[0];
@@ -324,7 +336,6 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
           }
 
           if (state && !attrName.startsWith("@")) {
-
             propsCurrent[attrName] = getValue(state, newValueKey);
             return _;
           }
@@ -463,7 +474,12 @@ export function render<T extends HTMLElement | HTMLTemplateElement>(
       const isFirst = backElement.firstElementChild === newEle;
 
       if (newEle) {
-        const newElement: HTMLElement = fn(newEle, propsCurrent);
+        const newElement: HTMLElement = fn(
+          newEle,
+          propsCurrent,
+          false,
+          isTemplate
+        );
         newElement.id = newElement.id || id;
         if (isRoot || isFirst) {
           ele = newElement;
