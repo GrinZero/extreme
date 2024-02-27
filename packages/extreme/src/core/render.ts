@@ -9,6 +9,7 @@ import {
 } from "./dom-str";
 import { extreme } from "./extreme";
 import { setCurrentListener } from "./listener";
+import { getParentDom, haveParentDom, setParentDom } from "./render-utils";
 
 export interface TemplateProps {
   state?: Record<string, any> | null;
@@ -144,7 +145,11 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
             if (newOpen) {
               // 还原到初始状态并插入到原本的位置
               const tmp = document.createElement("template");
+              if (!haveParentDom()) {
+                setParentDom(ele);
+              }
               const d = await render(tmp, dom, props);
+              setParentDom(null);
               const content = d as Element;
 
               if (sibling && parent) {
@@ -228,6 +233,9 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
               }
               return new Promise<string>((resolve) => {
                 idleCallback(async () => {
+                  if (!haveParentDom()) {
+                    setParentDom(ele);
+                  }
                   const d = await render(
                     template,
                     domStr,
@@ -235,6 +243,7 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
                     false,
                     true
                   );
+                  setParentDom(null);
                   resolve(d?.outerHTML || "");
                 });
               });
@@ -431,13 +440,14 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
         (source, key, start) => {
           const value = getValue(state, key);
           if (typeof value === "function") {
+            debugger
             const analyzeUpdateKey = analyzeKey(baseDomStr, source, start);
             if (analyzeUpdateKey === null) {
               console.error(`[extreme] ${source} is not a valid UpdateKey`);
               return source;
             }
             const rerenderDom = () => {
-              const dom = document.getElementById(id);
+              const dom = document.getElementById(ele?.id || id);
               if (!dom) return;
               const newValue = encodeValue(value());
               switch (analyzeUpdateKey.type) {
@@ -499,12 +509,16 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
       const isFirst = backElement.firstElementChild === newEle;
 
       if (newEle) {
+        if (!haveParentDom()) {
+          setParentDom(ele);
+        }
         const newElement: HTMLElement = await fn(
           newEle,
           propsCurrent,
           false,
           isTemplate
         );
+        setParentDom(null);
         newElement.id = newElement.id || id;
         if (isRoot || isFirst) {
           ele = newElement;
@@ -514,12 +528,15 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
   }
 
   // 遍历methodsMap，通过事件委托在父节点上绑定事件
+
   methodsMap.forEach((arr, event) => {
     const fnMap = new Map();
     arr.forEach(([id, fn]) => {
       fnMap.set(id, fn);
     });
-    ele!.addEventListener(event, (e) => {
+
+    const listenDom = getParentDom() || ele;
+    listenDom!.addEventListener(event, (e) => {
       const target = e.target as HTMLElement;
       if (target.id) {
         const fn = fnMap.get(target.id);
@@ -549,3 +566,5 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
 
   return ele;
 }
+
+// window.render = render;

@@ -79,7 +79,8 @@ export const analyzeKey = (
       continue;
     }
     if (template[i] === " " && type === "attr") {
-      return { type, key: template.slice(i + 1, start - 1) };
+      const key = template.slice(i + 1, start - 1);
+      return { type, key: key.replace(/=/g, "") };
     }
     if (template[i] === ">") {
       type = "content";

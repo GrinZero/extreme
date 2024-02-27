@@ -2,7 +2,7 @@
   <Jumbotron dispatch="{{dispatch}}" />
   <table class="table table-hover table-striped test-data">
     <tbody>
-      <Row :for="item in data" key="{{item.id}}" item="{{item}}" dispatch="{{dispatch}}"></Row>
+      <Row :for="item in data" key="{{item.id}}" selected="{{selected}}" item="{{item}}" dispatch="{{dispatch}}"></Row>
     </tbody>
   </table>
   <span class="preloadicon glyphicon glyphicon-remove" aria-hidden="true"></span>

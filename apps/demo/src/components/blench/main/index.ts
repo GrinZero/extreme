@@ -69,7 +69,6 @@ export const Main = createComponent("Main", () => {
   const dispatch = (action: { type: string; id: number }) => {
     switch (action.type) {
       case "RUN":
-        debugger
         setData(buildData(1000));
         setSelected(0);
         break;
