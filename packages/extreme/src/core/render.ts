@@ -9,7 +9,7 @@ import {
 } from "./dom-str";
 import { extreme } from "./extreme";
 import { setCurrentListener } from "./listener";
-import { getParentDom, haveParentDom, setParentDom } from "./render-utils";
+import { addEventListener, haveParentDom, setParentDom } from "./render-utils";
 
 export interface TemplateProps {
   state?: Record<string, any> | null;
@@ -87,6 +87,10 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
       const _key = key.trim();
       if (ref && _key in ref) {
         return `id="${ref[_key]}"`;
+      }
+      if(state && _key in state && typeof state[_key] === "string"){
+        // TODO: 增加对state function的支持
+        return `id="${state[_key]}"`;
       }
       return _;
     });
@@ -398,7 +402,6 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
 
       newDom += `></div>`;
       customTasks.push([dom, newDom]);
-      // debugger
       customJobs.push([id, fn, propsCurrent]);
       return source;
     });
@@ -440,7 +443,6 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
         (source, key, start) => {
           const value = getValue(state, key);
           if (typeof value === "function") {
-            debugger
             const analyzeUpdateKey = analyzeKey(baseDomStr, source, start);
             if (analyzeUpdateKey === null) {
               console.error(`[extreme] ${source} is not a valid UpdateKey`);
@@ -527,32 +529,12 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
     }
   }
 
-  // 遍历methodsMap，通过事件委托在父节点上绑定事件
-
+  // 遍历methodsMap，通过事件委托在根节点上绑定事件
   methodsMap.forEach((arr, event) => {
     const fnMap = new Map();
     arr.forEach(([id, fn]) => {
       fnMap.set(id, fn);
-    });
-
-    const listenDom = getParentDom() || ele;
-    listenDom!.addEventListener(event, (e) => {
-      const target = e.target as HTMLElement;
-      if (target.id) {
-        const fn = fnMap.get(target.id);
-        if (fn) {
-          fn(e);
-        }
-        return;
-      }
-      for (const [id, fn] of fnMap) {
-        const dom = document.getElementById(id);
-        if (!dom) continue;
-        if (dom.contains(target) && fn) {
-          fn(e);
-          return;
-        }
-      }
+      addEventListener(event, id, fn);
     });
   });
 
