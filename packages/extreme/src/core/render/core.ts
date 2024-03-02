@@ -1,5 +1,11 @@
-import { useState, type Ref } from "../hooks";
-import { markIdHandler } from "../worker/render";
+import { useState, type Ref } from "../../hooks";
+import {
+  collectCustomTaskHandler,
+  collectForTaskHandler,
+  collectIfTaskHandler,
+  collectMethodHanlder,
+  markIdHandler,
+} from "./handler";
 import {
   findDomStr,
   getDomID,
@@ -7,12 +13,12 @@ import {
   getRandomID,
   getHash,
   analyzeKey,
-  getDomAttr,
   addDomAttr,
-} from "./dom-str";
-import { extreme } from "./extreme";
-import { setCurrentListener } from "./listener";
-import { addEventListener, haveParentDom, setParentDom } from "./render-utils";
+} from "../dom-str";
+import { extreme } from "../extreme";
+import { setCurrentListener } from "../listener";
+import { addEventListener, haveParentDom, setParentDom } from "../render-utils";
+import { getValue } from "../../utils";
 
 export interface TemplateProps {
   state?: Record<string, any> | null;
@@ -20,24 +26,6 @@ export interface TemplateProps {
   methods?: Record<string, Function> | null;
 }
 
-const getValue = (state: Record<string, any>, key: string) => {
-  const _key = key.trim();
-  const keys = _key.split(".");
-  if (keys.length > 1) {
-    let value = state;
-    for (let i = 0; i < keys.length; i++) {
-      if (!value) return;
-      if (typeof value === "function") {
-        // @ts-ignore
-        return (...rest) => value(...rest)[keys[i]];
-      }
-      value = value[keys[i]];
-    }
-    return value;
-  } else {
-    return state[_key];
-  }
-};
 const encodeValue = (value: any) => {
   const str = String(value);
   return str.replace(/[\u00A0-\u9999<>\&]/gim, (i) => `&#${i.charCodeAt(0)};`);
@@ -65,28 +53,33 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
   const customJobs: [string, Function, Record<string, unknown>][] = [];
   const methodsMap = new Map<string, [string, Function][]>();
 
-  const addMethodTask = (methodName: string, funcName: string, dom: string) => {
-    const id = getDomID(dom);
-    if (methods && funcName in methods && id) {
-      const task = [id, methods[funcName]] as [string, Function];
+  // 第一阶段，为所有使用了{{}}的dom添加id，或者对id="{{ref}}"的dom进行替换
+  template = markIdHandler(template).replace(/id="{{(.*?)}}"/g, (_, key) => {
+    const _key = key.trim();
+    if (ref && _key in ref) {
+      return `id="${ref[_key]}"`;
+    }
+    if (state && _key in state && typeof state[_key] === "string") {
+      // TODO: 增加对state function的支持
+      return `id="${state[_key]}"`;
+    }
+    return _;
+  });
+
+  // 第二阶段，收集所有methods和对应的DOM节点
+  const { template: newTemplate, result: resultList } =
+    collectMethodHanlder(template);
+  template = newTemplate;
+
+  for (const { methodName, funcName, domId } of resultList) {
+    if (methods && funcName in methods && domId) {
+      const task = [domId, methods[funcName]] as [string, Function];
       if (!methodsMap.has(methodName)) {
         methodsMap.set(methodName, [task]);
       } else {
         methodsMap.get(methodName)!.push(task);
       }
     }
-  };
-
-  // 第一阶段，为所有使用了{{}}的dom添加id，或者对id="{{ref}}"的dom进行替换
-  template = markIdHandler(template, { ref, state });
-
-  // 第二阶段，收集所有methods和对应的DOM节点
-  {
-    template = template.replace(/@(.*?)}}"/g, (_, key, start) => {
-      const [methodName, funcName] = key.split(`=\"{{`);
-      addMethodTask(methodName, funcName, findDomStr(start, template));
-      return "";
-    });
   }
 
   // 第三阶段，识别:for和:if
@@ -94,14 +87,9 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
     if (state) {
       // :if
       const ifTasks: [string, string][] = [];
-      const testIfResult: [string, string, number][] = [];
-      template = template.replace(/:if="(.*?)"/g, (_, key, start) => {
-        testIfResult.push([_, key, start]);
-        return _;
-      });
+      const testIfResult = collectIfTaskHandler(template);
 
-      for (const [_, key, start] of testIfResult) {
-        const baseDom = findDomStr(start, template);
+      for (const [_, key, , baseDom] of testIfResult) {
         const dom = baseDom.replace(_, "");
         const value = getValue(state, key);
         const id = getDomID(baseDom)!;
@@ -171,27 +159,17 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
       // :for
       const forTasks: [string, string][] = [];
 
-      const testForResult: [string, string, number][] = [];
-      template = template.replace(/:for="(.*?)"/g, (_, key, start) => {
-        testForResult.push([_, key, start]);
-        return _;
-      });
-
-      for (const [_, key, start] of testForResult) {
-        const [itemName, listName] = key
-          .trim()
-          .split(" in ")
-          .map((_: string) => _.trim());
-
-        const baseDom = findDomStr(start, template);
-        const dom = baseDom.replace(_, "");
-        const parentDom = findDomStr(template.indexOf(baseDom) - 1, template);
-        const [newParentDOM, parentID] = addDomID(parentDom, getRandomID);
-        const keyIndex = (getDomAttr(baseDom, "key") || "key")
-          .replace("{{", "")
-          .replace("}}", "")
-          .replace(`${itemName}.`, "");
-
+      const forTaskList = collectForTaskHandler(template);
+      for (const {
+        baseDom,
+        itemName,
+        listName,
+        dom,
+        parentDom,
+        newParentDOM,
+        parentID,
+        keyIndex,
+      } of forTaskList) {
         const list = getValue(state, listName);
 
         const signalCache = new Map<string, Function>();
@@ -229,7 +207,6 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
           if (cloneProps.state && typeof cloneProps.state === "object") {
             cloneProps.state = {
               ...cloneProps.state,
-              // TODO：通过设置state()的render，可以在item改变时触发render快速得到新的dom，不用重计算item
               ...{ [itemName]: sign },
               key: item[keyIndex] ?? index,
             };
@@ -385,6 +362,7 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
           newParentDOM.replace(baseDom, listDom.join("")),
         ]);
       }
+
       for (const [baseDom, newDom] of forTasks) {
         template = template.replace(baseDom, newDom);
       }
@@ -393,64 +371,42 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
 
   // 递归阶段，将所有大写开头的DOM做处理
   {
-    const customTasks: [string, string][] = [];
-    template.replace(/<([A-Z].*?)[\/\>\s]/g, (source, name, start) => {
-      if (!extreme.store) return source;
-      const componentName = name.trim();
-
-      const dom = findDomStr(start, template);
-      const fn = extreme.store[componentName];
+    const jobs = collectCustomTaskHandler(template);
+    for (const { componentName, propsTask, dom } of jobs) {
       const propsCurrent: Record<string, unknown> = {};
-      dom.replace(/\s(.*?)="(.*?)"/g, (_, _attrKey, _valueKey) => {
-        const attrName = _attrKey.trim();
-        const valueKey = _valueKey.trim();
-
-        if (/{{(.*?)}}/.test(valueKey)) {
-          const newValueKey = valueKey.split("{{")[1].split("}}")[0];
-
-          if (attrName === "id" && ref) {
-            propsCurrent[attrName] = getValue(ref, newValueKey);
-            return _;
-          }
-
-          if (attrName.startsWith(":")) {
-            propsCurrent[attrName] = `{{${newValueKey}}}`;
-            return _;
-          }
-
-          if (state && !attrName.startsWith("@")) {
-            propsCurrent[attrName] = getValue(state, newValueKey);
-            return _;
-          }
+      for (const { key, value, type } of propsTask) {
+        if (type === "ref" && ref) {
+          propsCurrent[key] = getValue(ref, value);
+        } else if (type === "state" && state) {
+          propsCurrent[key] = getValue(state, value);
+        } else if (type === "text") {
+          propsCurrent[key] = value;
         }
-
-        propsCurrent[attrName] = valueKey;
-        return _;
-      });
+      }
 
       const id = (propsCurrent.id as string) || getDomID(dom) || getRandomID();
-      let newDom = `<div id="${id}"`;
-      if (":if" in props) {
-        newDom += ` :if="${props[":if"]}"`;
-        delete props[":if"];
-      }
-      if (":for" in props) {
-        newDom += ` :for="${props[":for"]}"`;
-        delete props[":for"];
-      }
-      Object.keys(props).forEach((key) => {
-        if (key.startsWith("@")) {
-          newDom += ` ${key}="${propsCurrent[key]}"`;
-          delete propsCurrent[key];
-        }
-      });
 
+      let newDom = `<div id="${id}"`;
+      // if (":if" in props) {
+      //   newDom += ` :if="${props[":if"]}"`;
+      //   delete props[":if"];
+      // }
+      // if (":for" in props) {
+      //   newDom += ` :for="${props[":for"]}"`;
+      //   delete props[":for"];
+      // }
+      // Object.keys(props).forEach((key) => {
+      //   if (key.startsWith("@")) {
+      //     newDom += ` ${key}="${propsCurrent[key]}"`;
+      //     delete propsCurrent[key];
+      //   }
+      // });
       newDom += `></div>`;
-      customTasks.push([dom, newDom]);
-      customJobs.push([id, fn, propsCurrent]);
-      return source;
-    });
-    for (const [dom, newDom] of customTasks) {
+
+      const fn = extreme.store[componentName];
+      if (fn) {
+        customJobs.push([id, fn, propsCurrent]);
+      }
       template = template.replace(dom, newDom);
     }
   }
@@ -499,7 +455,6 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
               updateDom !== baseDomStr ? updateDom.indexOf(source) : start
             );
             if (analyzeUpdateKey === null) {
-              // debugger;
               console.error(`[extreme] ${source} is not a valid UpdateKey`);
               return source;
             }
@@ -507,7 +462,6 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
               const dom =
                 document.getElementById(updateDomId ?? ele?.id ?? id) ||
                 document.getElementById(ele?.id ?? id);
-              // debugger
               if (!dom) return;
               const newValue = encodeValue(value());
               switch (analyzeUpdateKey.type) {

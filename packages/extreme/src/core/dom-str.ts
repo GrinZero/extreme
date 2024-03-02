@@ -86,11 +86,22 @@ export type AnalyzeUpdateKey =
     }
   | null;
 
+const analyzeResultCache = new Map<string, AnalyzeUpdateKey>();
+
 export const analyzeKey = (
   template: string,
   source: string,
   start: number
 ): AnalyzeUpdateKey => {
+  const key = `${template}#${source}#${start}`;
+  if (analyzeResultCache.has(key)) {
+    return analyzeResultCache.get(key)!;
+  }
+  const back = (result: AnalyzeUpdateKey) => {
+    analyzeResultCache.set(key, result);
+    return result;
+  };
+
   let type: string | undefined;
   let contentStart: number | undefined;
   for (let i = start; i >= 0; i--) {
@@ -100,7 +111,7 @@ export const analyzeKey = (
     }
     if (template[i] === " " && type === "attr") {
       const key = template.slice(i + 1, start - 1);
-      return { type, key: key.replace(/=/g, "") };
+      return back({ type, key: key.replace(/=/g, "") });
     }
     if (template[i] === ">") {
       type = "content";
@@ -113,8 +124,10 @@ export const analyzeKey = (
     let tag = "";
     for (let i = 1; i < template.length; i++) {
       if (template[i] === " " || template[i] === ">") {
-        tag = template.slice(1, i + 1);
-        tag = tag.replace(/(<|>|\/)/g, "").trim();
+        tag = template
+          .slice(1, i + 1)
+          .replace(/(<|>|\/)/g, "")
+          .trim();
         break;
       }
     }
@@ -123,7 +136,7 @@ export const analyzeKey = (
     const endTagIndex = template.lastIndexOf(endTag);
     const textContent = template.slice(contentStart as number, endTagIndex);
     if (source === textContent) {
-      return { type: "textContent", key: "textContent" };
+      return back({ type: "textContent", key: "textContent" });
     }
     // analyze the index of the childNodes
 
@@ -141,14 +154,14 @@ export const analyzeKey = (
         child.nodeType === Node.TEXT_NODE &&
         child.textContent?.indexOf(source) !== -1
       ) {
-        return {
+        return back({
           type: "textNode",
           key: i,
           content: child.textContent!,
-        };
+        });
       }
     }
   }
 
-  return null;
+  return back(null);
 };
