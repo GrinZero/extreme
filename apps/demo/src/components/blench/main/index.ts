@@ -108,7 +108,6 @@ export const Main = createComponent("Main", () => {
         break;
       }
       case "SELECT":
-        debugger
         setSelected(action.id);
         break;
       default:

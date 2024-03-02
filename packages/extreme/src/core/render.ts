@@ -97,6 +97,7 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
       return _;
     });
   }
+
   // 第二阶段，收集所有methods和对应的DOM节点
   {
     template = template.replace(/@(.*?)}}"/g, (_, key, start) => {
@@ -234,6 +235,7 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
           if (cloneProps.state && typeof cloneProps.state === "object") {
             cloneProps.state = {
               ...cloneProps.state,
+              // TODO：通过设置state()的render，可以在item改变时触发render快速得到新的dom，不用重计算
               ...{ [itemName]: item },
               key: item[keyIndex] ?? index,
             };
@@ -258,6 +260,31 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
             const parent = document.getElementById(parentID);
             if (!parent) return;
 
+            if (oldList.length === 0 && parent.children.length === 0) {
+              const listDom = await renderList(newList).then((list) =>
+                list.join("")
+              );
+
+              const tmp = document.createElement("template");
+              tmp.innerHTML = listDom;
+              const renderDom = tmp.content;
+              parent.appendChild(renderDom);
+              return;
+            }
+
+            const oldKeyToIndex = new Map(
+              oldList.map((item, index) => [
+                String(item[keyIndex] ?? index),
+                index,
+              ])
+            );
+            const newKeyToIndex = new Map(
+              newList.map((item, index) => [
+                String(item[keyIndex] ?? index),
+                index,
+              ])
+            );
+
             const oldKeylist = oldList.map((item, index) =>
               String(item[keyIndex] ?? index)
             );
@@ -265,17 +292,21 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
               return String(item[keyIndex] ?? index);
             });
             // 处理新增、移动、修改、删除的情况，确保顺序和位置正确，且最小化dom操作
-            const childNodes = Array.from(parent.children);
             const usagKeyList = new Set(newKeylist);
 
             const toRemove: Element[] = [];
-            for (const curKey of oldKeylist) {
-              if (newKeylist.indexOf(curKey) === -1 && curKey) {
-                const oldIndex = oldKeylist.indexOf(curKey);
+            const newKeySet = new Set(newKeylist);
+            for (const oldKey of oldKeylist) {
+              if (oldKey && !newKeySet.has(oldKey)) {
+                const oldIndex = oldKeyToIndex.get(oldKey) ?? -1;
                 const dom = parent.children[oldIndex];
-                toRemove.push(dom);
+                dom && toRemove.push(dom);
               }
             }
+            for (const dom of toRemove) {
+              dom.remove();
+            }
+            const childNodes = Array.from(parent.children);
 
             if (newKeylist.length > 0) {
               // 移动、修改
@@ -283,10 +314,14 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
                 const childNode = childNodes[i];
                 const curKey = childNode.getAttribute("key");
                 if (!curKey) continue;
-                const index = newKeylist.indexOf(curKey);
-                const oldIndex = oldKeylist.indexOf(curKey);
+                const index = newKeyToIndex.get(curKey) ?? -1;
+                const oldIndex = oldKeyToIndex.get(curKey) ?? -1;
                 const oldData = oldList[oldIndex];
                 const newData = newList[index];
+
+                if (!newData) {
+                  continue;
+                }
 
                 if (index === oldIndex) {
                   // 位置正确，不需要移动
@@ -305,8 +340,10 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
                       parent.appendChild(childNode);
                     }
                   } else {
-                    const preIndexElement = parent.children[index];
-                    parent.insertBefore(childNode, preIndexElement);
+                    const indexElement = parent.children[index];
+                    if (indexElement !== childNode) {
+                      parent.insertBefore(childNode, indexElement);
+                    }
                   }
                   if (oldData !== newData && newList[index]) {
                     const renderDom = await renderItem(newList[index], index);
@@ -317,8 +354,8 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
                 }
                 usagKeyList.delete(curKey);
               }
-              // 新增
 
+              // 新增
               for (const curKey of usagKeyList) {
                 const index = newKeylist.indexOf(curKey);
                 if (!newList[index]) continue;
@@ -333,10 +370,6 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
                   parent.appendChild(renderDomNode);
                 }
               }
-            }
-            // 删除
-            for (const dom of toRemove) {
-              dom && dom.remove();
             }
           };
           setCurrentListener(rerenderList);
@@ -426,6 +459,8 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
       template = template.replace(dom, newDom);
     }
   }
+
+  // 第四阶段，渲染所有dom
 
   template = template.replace(/{{(.*?)}}/g, (source, key, start) => {
     if (!state) return `[without state "${key}"]`;

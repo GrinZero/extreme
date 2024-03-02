@@ -1,4 +1,6 @@
-export type GetState<T = unknown> = (fn?: (v?: T, old?: T) => void) => T;
+export type GetState<T = unknown> = (
+  fn?: (v?: T, old?: T) => void | Promise<void>
+) => T;
 export type SetState<T = unknown> = (v: T) => void;
 import { getCurrentListener } from "../core/listener";
 
@@ -7,7 +9,7 @@ export const idleCallback =
 
 export const useState = <T = unknown>(value: T) => {
   let _value = value;
-  const set = new Set<(v?: T, old?: T) => void>();
+  const set = new Set<(v?: T, old?: T) => void | Promise<void>>();
   const getValue: GetState<T> = (fn) => {
     const listener = getCurrentListener();
     if (listener) set.add(listener);
@@ -19,7 +21,7 @@ export const useState = <T = unknown>(value: T) => {
     const oldV = _value;
     _value = value;
     for (const fn of set) {
-      fn(_value, oldV)
+      await fn(_value, oldV);
     }
   };
   return [getValue, setValue] as const;
