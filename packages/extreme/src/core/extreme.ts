@@ -39,6 +39,13 @@ export const createComponent = <Props extends Record<any, unknown>>(
       ? document.createElement("template")
       : element;
 
+    if(props.key){
+      result.state = {
+        ...result.state || {},
+        key: props.key
+      }
+    }
+
     const ele = await render(
       pushElement,
       result.template,

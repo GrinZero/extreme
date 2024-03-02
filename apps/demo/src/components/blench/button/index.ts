@@ -2,21 +2,21 @@ import template from "./index.html?raw";
 import { createComponent, useMount } from "@sourcebug/extreme/dev";
 
 export const MyButton = createComponent<{
-  id: string;
+  sid: string;
   cb: () => void;
   title: string;
-}>("MyButton", ({ id, cb, title }) => {
+}>("MyButton", ({ sid, cb, title }) => {
   useMount(() => {
-    document.getElementById(id)?.addEventListener("click", cb);
+    document.getElementById(sid)?.addEventListener("click", cb);
     return () => {
-      document.getElementById(id)?.removeEventListener("click", cb);
+      document.getElementById(sid)?.removeEventListener("click", cb);
     };
   });
 
   return {
     template,
     state: {
-      id,
+      sid,
       title,
     },
     methods: {

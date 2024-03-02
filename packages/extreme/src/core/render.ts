@@ -6,6 +6,8 @@ import {
   getRandomID,
   getHash,
   analyzeKey,
+  getDomAttr,
+  addDomAttr,
 } from "./dom-str";
 import { extreme } from "./extreme";
 import { setCurrentListener } from "./listener";
@@ -88,7 +90,7 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
       if (ref && _key in ref) {
         return `id="${ref[_key]}"`;
       }
-      if(state && _key in state && typeof state[_key] === "string"){
+      if (state && _key in state && typeof state[_key] === "string") {
         // TODO: 增加对state function的支持
         return `id="${state[_key]}"`;
       }
@@ -201,58 +203,54 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
         const dom = baseDom.replace(_, "");
         const parentDom = findDomStr(template.indexOf(baseDom) - 1, template);
         const [newParentDOM, parentID] = addDomID(parentDom, getRandomID);
+        const keyIndex = (getDomAttr(baseDom, "key") || "key")
+          .replace("{{", "")
+          .replace("}}", "")
+          .replace(`${itemName}.`, "");
 
         const list = getValue(state, listName);
-        const renderList = async (data: any[]) => {
-          const domList = data.map((item: any, index: number) => {
-            const listID = getHash(String(item.key ?? index));
-            let [newDom] = addDomID(dom, listID);
-            newDom = newDom.replace(/id="(.*?)"/g, (source, key) => {
-              if (key === listID) {
-                return source;
-              }
-              return `id="${listID}Y${key}"`;
-            });
-            newDom = newDom.replace(/{{(.*?)}}/g, (_, key) => {
-              if (key === itemName) {
-                return _;
-              }
-              const value = getValue(item, key.replace(`${itemName}.`, ""));
-              if (value === undefined) {
-                return _;
-              }
-              return encodeValue(typeof value === "function" ? value() : value);
-            });
-            return newDom;
+
+        const renderItem = async (item: any, index: number) => {
+          const listID = getHash(String(item[keyIndex] ?? index));
+          let [newDom] = addDomID(dom, listID);
+          newDom = newDom.replace(/id="(.*?)"/g, (source, key) => {
+            if (key === listID) {
+              return source;
+            }
+            return `id="${listID}Y${key}"`;
           });
-          return await Promise.all(
-            domList.map((domStr, i) => {
-              const template = document.createElement("template");
-              const cloneProps = { ...props };
-              if (cloneProps.state && typeof cloneProps.state === "object") {
-                cloneProps.state = {
-                  ...cloneProps.state,
-                  ...{ [itemName]: data[i] },
-                };
-              }
-              return new Promise<string>((resolve) => {
-                idleCallback(async () => {
-                  if (!haveParentDom()) {
-                    setParentDom(ele);
-                  }
-                  const d = await render(
-                    template,
-                    domStr,
-                    cloneProps,
-                    false,
-                    true
-                  );
-                  setParentDom(null);
-                  resolve(d?.outerHTML || "");
-                });
-              });
-            })
-          );
+          newDom = newDom.replace(/{{(.*?)}}/g, (_, key) => {
+            if (key === itemName) {
+              return _;
+            }
+            const value = getValue(item, key.replace(`${itemName}.`, ""));
+            if (value === undefined) {
+              return _;
+            }
+            return encodeValue(typeof value === "function" ? value() : value);
+          });
+          const template = document.createElement("template");
+          const cloneProps = { ...props };
+          if (cloneProps.state && typeof cloneProps.state === "object") {
+            cloneProps.state = {
+              ...cloneProps.state,
+              ...{ [itemName]: item },
+              key: item[keyIndex] ?? index,
+            };
+          }
+          if (!haveParentDom()) {
+            setParentDom(ele);
+          }
+          const d = await render(template, newDom, cloneProps, false, true);
+          setParentDom(null);
+          return d?.outerHTML || "";
+        };
+        const renderList = async (data: any[]) => {
+          const listDom: string[] = [];
+          for (let i = 0; i < data.length; i++) {
+            listDom.push(await renderItem(data[i], i));
+          }
+          return listDom;
         };
 
         if (typeof list === "function") {
@@ -260,49 +258,71 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
             const parent = document.getElementById(parentID);
             if (!parent) return;
 
-            const oldListRender = await renderList(oldList);
-            const newListRender = await renderList(newList);
-            const oldIDList = oldListRender.map((item) => getDomID(item));
-            const newIDList = newListRender.map((item) => getDomID(item));
+            const oldKeylist = oldList.map((item, index) =>
+              String(item[keyIndex] ?? index)
+            );
+            const newKeylist = newList.map((item, index) => {
+              return String(item[keyIndex] ?? index);
+            });
             // 处理新增、移动、修改、删除的情况，确保顺序和位置正确，且最小化dom操作
             const childNodes = Array.from(parent.children);
-            const useagNewIDList = new Set(newIDList);
-            if (newIDList.length > 0) {
+            const usagKeyList = new Set(newKeylist);
+
+            const toRemove: Element[] = [];
+            for (const curKey of oldKeylist) {
+              if (newKeylist.indexOf(curKey) === -1 && curKey) {
+                const oldIndex = oldKeylist.indexOf(curKey);
+                const dom = parent.children[oldIndex];
+                toRemove.push(dom);
+              }
+            }
+
+            if (newKeylist.length > 0) {
               // 移动、修改
               for (let i = 0; i < childNodes.length; i++) {
                 const childNode = childNodes[i];
-                const id = childNode.id;
-                if (!id) continue;
-                const index = newIDList.indexOf(id);
-                const oldIndex = oldIDList.indexOf(id);
-                const renderDom = newListRender[index];
-                const oldDom = oldListRender[index];
+                const curKey = childNode.getAttribute("key");
+                if (!curKey) continue;
+                const index = newKeylist.indexOf(curKey);
+                const oldIndex = oldKeylist.indexOf(curKey);
+                const oldData = oldList[oldIndex];
+                const newData = newList[index];
+
                 if (index === oldIndex) {
                   // 位置正确，不需要移动
-                  if (renderDom !== oldDom && renderDom) {
-                    childNode.outerHTML = renderDom;
+                  if (oldData !== newData && newList[index]) {
+                    const renderDom = await renderItem(newList[index], index);
+                    if (renderDom !== childNode.outerHTML) {
+                      childNode.outerHTML = renderDom;
+                    }
                   }
                 } else {
-                  const nextIndexElement = parent.children[index + 1];
                   if (index > oldIndex) {
+                    const nextIndexElement = parent.children[index + 1];
                     if (nextIndexElement) {
                       parent.insertBefore(childNode, nextIndexElement);
                     } else {
                       parent.appendChild(childNode);
                     }
                   } else {
-                    parent.insertBefore(childNode, nextIndexElement);
+                    const preIndexElement = parent.children[index];
+                    parent.insertBefore(childNode, preIndexElement);
                   }
-                  if (renderDom !== oldDom && renderDom) {
-                    childNode.outerHTML = renderDom;
+                  if (oldData !== newData && newList[index]) {
+                    const renderDom = await renderItem(newList[index], index);
+                    if (renderDom !== childNode.outerHTML) {
+                      childNode.outerHTML = renderDom;
+                    }
                   }
                 }
-                useagNewIDList.delete(id);
+                usagKeyList.delete(curKey);
               }
               // 新增
-              useagNewIDList.forEach((id) => {
-                const index = newIDList.indexOf(id);
-                const renderDom = newListRender[index];
+
+              for (const curKey of usagKeyList) {
+                const index = newKeylist.indexOf(curKey);
+                if (!newList[index]) continue;
+                const renderDom = await renderItem(newList[index], index);
                 const nextIndexElement = parent.children[index + 1];
                 const tmp = document.createElement("template");
                 tmp.innerHTML = renderDom;
@@ -312,14 +332,11 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
                 } else {
                   parent.appendChild(renderDomNode);
                 }
-              });
+              }
             }
             // 删除
-            for (const id of oldIDList) {
-              if (newIDList.indexOf(id) === -1 && id) {
-                const dom = document.getElementById(id);
-                dom && dom.remove();
-              }
+            for (const dom of toRemove) {
+              dom && dom.remove();
             }
           };
           setCurrentListener(rerenderList);
@@ -489,6 +506,13 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
     ? Array.prototype.indexOf.call(parent.children, element)
     : -1;
 
+  // add key
+
+  if (state?.key) {
+    let [newKeyDom] = addDomAttr(template, "key", state.key);
+    template = newKeyDom;
+  }
+
   element.innerHTML = template;
 
   let ele = isTemplateNode
@@ -548,5 +572,3 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
 
   return ele;
 }
-
-// window.render = render;

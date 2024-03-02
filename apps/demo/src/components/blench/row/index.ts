@@ -6,7 +6,6 @@ export const Row = createComponent<{
   item: { id: number; label: string };
   dispatch: (action: { type: string; id: number }) => void;
 }>("Row", ({ selected, item, dispatch }) => {
-  // debugger
   return {
     template,
     state: {

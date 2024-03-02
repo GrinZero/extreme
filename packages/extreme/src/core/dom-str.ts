@@ -33,24 +33,36 @@ export const findDomStr = (index: number, htmlText: string) => {
   return htmlText.slice(firstDOMIndex, lastIndex);
 };
 
-export const getDomID = (domStr: string) => domStr.match(/id="(.*?)"/)?.[1];
-
-export const addDomID = (domStr: string, newID: string | (() => string)) => {
-  let id = "";
+export const getDomAttr = (domStr: string, attr: string) => {
+  return domStr.match(new RegExp(`${attr}="(.*?)"`))?.[1];
+};
+export const addDomAttr = (
+  domStr: string,
+  attr: string,
+  value: string | (() => string)
+) => {
+  let attrValue = "";
   const firstEndIndex = domStr.indexOf(">");
-  const idIndex = domStr.indexOf("id=");
-  if (idIndex === -1 || idIndex > firstEndIndex) {
-    id = typeof newID === "function" ? newID() : newID;
-    const replaceStr = ` id="${id}"`;
+  const attrIndex = domStr.indexOf(attr + "=");
+  if (attrIndex === -1 || attrIndex > firstEndIndex) {
+    attrValue = typeof value === "function" ? value() : value;
+    const replaceStr = ` ${attr}="${attrValue}"`;
     if (domStr.indexOf("/>") !== -1) {
       domStr = domStr.replace("/>", replaceStr + "/>");
     } else {
       domStr = domStr.replace(">", replaceStr + ">");
     }
   } else {
-    id = domStr.match(/id="(.*?)"/)?.[1] || getRandomID();
+    attrValue = getDomAttr(domStr, attr) || "";
   }
-  return [domStr, id];
+  return [domStr, attrValue];
+};
+
+export const getDomID = (domStr: string) => getDomAttr(domStr, "id");
+
+export const addDomID = (domStr: string, newID: string | (() => string)) => {
+  const [domStrWithID, id] = addDomAttr(domStr, "id", newID);
+  return [domStrWithID, id || getRandomID()];
 };
 
 export const getHash = (str: string) => "W" + btoa(str).replace(/=/g, "ace");
