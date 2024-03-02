@@ -1,6 +1,12 @@
 export const getRandomID = () => "W" + Math.random().toString(36).slice(2, 10);
 
+const domStrCache = new Map<string, string>();
 export const findDomStr = (index: number, htmlText: string) => {
+  const key = `${index}#-${htmlText}`;
+  if (domStrCache.has(key)) {
+    return domStrCache.get(key)!;
+  }
+
   let firstDOMIndex = htmlText.lastIndexOf("<", index);
 
   let tag = "";
@@ -30,7 +36,9 @@ export const findDomStr = (index: number, htmlText: string) => {
       break;
     }
   }
-  return htmlText.slice(firstDOMIndex, lastIndex);
+  const result = htmlText.slice(firstDOMIndex, lastIndex);
+  domStrCache.set(key, result);
+  return result;
 };
 
 export const getDomAttr = (domStr: string, attr: string) => {
@@ -65,7 +73,7 @@ export const addDomID = (domStr: string, newID: string | (() => string)) => {
   return [domStrWithID, id || getRandomID()];
 };
 
-export const getHash = (str: string) => "W" + btoa(str).replace(/=/g, "ace");
+export const getHash = (str: string) => "W" + btoa(str).replace(/=/g, "~");
 
 const analyzeDomCache = new Map<string, HTMLDivElement>();
 

@@ -1,4 +1,5 @@
-import { type Ref } from "../hooks";
+import { useState, type Ref } from "../hooks";
+import { markIdHandler } from "../worker/render";
 import {
   findDomStr,
   getDomID,
@@ -26,6 +27,10 @@ const getValue = (state: Record<string, any>, key: string) => {
     let value = state;
     for (let i = 0; i < keys.length; i++) {
       if (!value) return;
+      if (typeof value === "function") {
+        // @ts-ignore
+        return (...rest) => value(...rest)[keys[i]];
+      }
       value = value[keys[i]];
     }
     return value;
@@ -73,30 +78,7 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
   };
 
   // 第一阶段，为所有使用了{{}}的dom添加id，或者对id="{{ref}}"的dom进行替换
-  {
-    const usageDomSet = new Set<string>();
-    template.replace(/{{(.*?)}}/g, (_, _key, start) => {
-      usageDomSet.add(findDomStr(start, template));
-      return _;
-    });
-    usageDomSet.forEach((dom) => {
-      if (dom.indexOf("id=") === -1) {
-        const [newDom] = addDomID(dom, getRandomID);
-        template = template.replace(dom, newDom);
-      }
-    });
-    template = template.replace(/id="{{(.*?)}}"/g, (_, key) => {
-      const _key = key.trim();
-      if (ref && _key in ref) {
-        return `id="${ref[_key]}"`;
-      }
-      if (state && _key in state && typeof state[_key] === "string") {
-        // TODO: 增加对state function的支持
-        return `id="${state[_key]}"`;
-      }
-      return _;
-    });
-  }
+  template = markIdHandler(template, { ref, state });
 
   // 第二阶段，收集所有methods和对应的DOM节点
   {
@@ -194,6 +176,7 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
         testForResult.push([_, key, start]);
         return _;
       });
+
       for (const [_, key, start] of testForResult) {
         const [itemName, listName] = key
           .trim()
@@ -211,8 +194,16 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
 
         const list = getValue(state, listName);
 
+        const signalCache = new Map<string, Function>();
         const renderItem = async (item: any, index: number) => {
-          const listID = getHash(String(item[keyIndex] ?? index));
+          const curKey = String(item[keyIndex] ?? index);
+          if (signalCache.has(curKey)) {
+            const fn = signalCache.get(curKey)!;
+            fn(item);
+            return "";
+          }
+
+          const listID = getHash(curKey);
           let [newDom] = addDomID(dom, listID);
           newDom = newDom.replace(/id="(.*?)"/g, (source, key) => {
             if (key === listID) {
@@ -232,11 +223,14 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
           });
           const template = document.createElement("template");
           const cloneProps = { ...props };
+          const [sign, setSign] = useState(item);
+          signalCache.set(curKey, setSign);
+
           if (cloneProps.state && typeof cloneProps.state === "object") {
             cloneProps.state = {
               ...cloneProps.state,
-              // TODO：通过设置state()的render，可以在item改变时触发render快速得到新的dom，不用重计算
-              ...{ [itemName]: item },
+              // TODO：通过设置state()的render，可以在item改变时触发render快速得到新的dom，不用重计算item
+              ...{ [itemName]: sign },
               key: item[keyIndex] ?? index,
             };
           }
@@ -301,6 +295,7 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
                 const oldIndex = oldKeyToIndex.get(oldKey) ?? -1;
                 const dom = parent.children[oldIndex];
                 dom && toRemove.push(dom);
+                signalCache.delete(oldKey);
               }
             }
             for (const dom of toRemove) {
@@ -326,10 +321,10 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
                 if (index === oldIndex) {
                   // 位置正确，不需要移动
                   if (oldData !== newData && newList[index]) {
-                    const renderDom = await renderItem(newList[index], index);
-                    if (renderDom !== childNode.outerHTML) {
-                      childNode.outerHTML = renderDom;
-                    }
+                    await renderItem(newList[index], index);
+                    // if (renderDom !== childNode.outerHTML) {
+                    //   childNode.outerHTML = renderDom;
+                    // }
                   }
                 } else {
                   if (index > oldIndex) {
@@ -346,10 +341,10 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
                     }
                   }
                   if (oldData !== newData && newList[index]) {
-                    const renderDom = await renderItem(newList[index], index);
-                    if (renderDom !== childNode.outerHTML) {
-                      childNode.outerHTML = renderDom;
-                    }
+                    await renderItem(newList[index], index);
+                    // if (renderDom !== childNode.outerHTML) {
+                    //   childNode.outerHTML = renderDom;
+                    // }
                   }
                 }
                 usagKeyList.delete(curKey);
@@ -494,14 +489,25 @@ export async function render<T extends HTMLElement | HTMLTemplateElement>(
         /{{(.*?)}}/g,
         (source, key, start) => {
           const value = getValue(state, key);
+          // debugger;
           if (typeof value === "function") {
-            const analyzeUpdateKey = analyzeKey(baseDomStr, source, start);
+            const updateDom = findDomStr(start, baseDomStr);
+            const updateDomId = getDomID(updateDom);
+            const analyzeUpdateKey = analyzeKey(
+              updateDom,
+              source,
+              updateDom !== baseDomStr ? updateDom.indexOf(source) : start
+            );
             if (analyzeUpdateKey === null) {
+              // debugger;
               console.error(`[extreme] ${source} is not a valid UpdateKey`);
               return source;
             }
             const rerenderDom = () => {
-              const dom = document.getElementById(ele?.id || id);
+              const dom =
+                document.getElementById(updateDomId ?? ele?.id ?? id) ||
+                document.getElementById(ele?.id ?? id);
+              // debugger
               if (!dom) return;
               const newValue = encodeValue(value());
               switch (analyzeUpdateKey.type) {
