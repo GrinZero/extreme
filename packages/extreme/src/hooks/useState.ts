@@ -19,9 +19,7 @@ export const useState = <T = unknown>(value: T) => {
     const oldV = _value;
     _value = value;
     for (const fn of set) {
-      await new Promise((resolve) => {
-        idleCallback(() => resolve(fn(_value, oldV)));
-      });
+      fn(_value, oldV)
     }
   };
   return [getValue, setValue] as const;
