@@ -1,4 +1,4 @@
-import { idleCallback, type Ref } from "../hooks";
+import { type Ref } from "../hooks";
 import {
   findDomStr,
   getDomID,
