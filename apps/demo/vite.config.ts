@@ -9,8 +9,8 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": resolve(__dirname, "src"),
-      "@sourcebug/extreme/dev":
-        mode === "production" ? "@sourcebug/extreme" : "@sourcebug/extreme/dev",
+      // "@sourcebug/extreme/dev":
+      //   mode === "production" ? "@sourcebug/extreme" : "@sourcebug/extreme/dev",
     },
   },
   test: {
