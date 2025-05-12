@@ -9,6 +9,7 @@
   <p align="center">
    <img src="https://img.shields.io/badge/TypeScript-3178C6.svg?style=for-the-badge&logo=TypeScript&logoColor=white" alt="TypeScript" />
    <img src="https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=FFD62E" alt="Vite"/>
+    <a href="https://deepwiki.com/GrinZero/extreme"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
  </p>
 
 </div>
